@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -56,17 +57,24 @@ class WidgetConfigActivity : ComponentActivity() {
 
                 Column(Modifier.fillMaxSize().padding(16.dp)) {
                     Text("配置 AIQuota 小组件", style = MaterialTheme.typography.headlineSmall)
-                    Text("每个小组件都可以独立选择显示内容。")
+                    Text("每个小组件都可以独立选择内容、布局和显示条数。")
 
                     LazyColumn(
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 620.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        item { Text("显示内容", style = MaterialTheme.typography.titleMedium) }
                         item {
                             ChoiceCard(
                                 title = "全部账号",
                                 selected = config.mode == WidgetConfigStore.Mode.ALL,
-                                onClick = { config = WidgetConfigStore.Config(WidgetConfigStore.Mode.ALL) }
+                                onClick = {
+                                    config = config.copy(
+                                        mode = WidgetConfigStore.Mode.ALL,
+                                        provider = null,
+                                        accountId = null
+                                    )
+                                }
                             )
                         }
                         ProviderId.entries.forEach { provider ->
@@ -75,9 +83,10 @@ class WidgetConfigActivity : ComponentActivity() {
                                     title = "只显示 ${provider.name}",
                                     selected = config.mode == WidgetConfigStore.Mode.PROVIDER && config.provider == provider,
                                     onClick = {
-                                        config = WidgetConfigStore.Config(
+                                        config = config.copy(
                                             mode = WidgetConfigStore.Mode.PROVIDER,
-                                            provider = provider
+                                            provider = provider,
+                                            accountId = null
                                         )
                                     }
                                 )
@@ -90,12 +99,36 @@ class WidgetConfigActivity : ComponentActivity() {
                                     title = "${account.provider.name} · ${account.name}",
                                     selected = config.mode == WidgetConfigStore.Mode.ACCOUNT && config.accountId == account.id,
                                     onClick = {
-                                        config = WidgetConfigStore.Config(
+                                        config = config.copy(
                                             mode = WidgetConfigStore.Mode.ACCOUNT,
+                                            provider = null,
                                             accountId = account.id
                                         )
                                     }
                                 )
+                            }
+                        }
+
+                        item { Text("布局", style = MaterialTheme.typography.titleMedium) }
+                        item {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = { config = config.copy(layout = WidgetConfigStore.Layout.COMPACT) }) {
+                                    Text(if (config.layout == WidgetConfigStore.Layout.COMPACT) "● 紧凑" else "○ 紧凑")
+                                }
+                                TextButton(onClick = { config = config.copy(layout = WidgetConfigStore.Layout.DETAILED) }) {
+                                    Text(if (config.layout == WidgetConfigStore.Layout.DETAILED) "● 详细" else "○ 详细")
+                                }
+                            }
+                        }
+
+                        item { Text("显示条数", style = MaterialTheme.typography.titleMedium) }
+                        item {
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                listOf(1, 2, 4, 6, 8).forEach { count ->
+                                    TextButton(onClick = { config = config.copy(maxRows = count) }) {
+                                        Text(if (config.maxRows == count) "● $count" else "$count")
+                                    }
+                                }
                             }
                         }
                     }
