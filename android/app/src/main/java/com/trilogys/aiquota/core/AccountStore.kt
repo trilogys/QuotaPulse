@@ -29,12 +29,34 @@ class AccountStore(context: Context) {
     fun upsert(account: AccountRecord) {
         val items = accounts().toMutableList()
         val index = items.indexOfFirst { it.id == account.id }
-        if (index >= 0) items[index] = account else items += account
-        saveAccounts(items)
+        if (index >= 0) {
+            items[index] = account
+        } else {
+            val nextOrder = (items.maxOfOrNull { it.order } ?: -1) + 1
+            items += account.copy(order = nextOrder)
+        }
+        saveAccounts(normalizeOrder(items))
+    }
+
+    fun setEnabled(accountId: String, enabled: Boolean) {
+        val items = accounts().map { if (it.id == accountId) it.copy(enabled = enabled) else it }
+        saveAccounts(normalizeOrder(items))
+    }
+
+    fun move(accountId: String, delta: Int) {
+        if (delta == 0) return
+        val items = normalizeOrder(accounts()).toMutableList()
+        val from = items.indexOfFirst { it.id == accountId }
+        if (from < 0) return
+        val to = (from + delta).coerceIn(0, items.lastIndex)
+        if (from == to) return
+        val item = items.removeAt(from)
+        items.add(to, item)
+        saveAccounts(normalizeOrder(items))
     }
 
     fun delete(accountId: String) {
-        saveAccounts(accounts().filterNot { it.id == accountId })
+        saveAccounts(normalizeOrder(accounts().filterNot { it.id == accountId }))
         prefs.edit().remove("snapshot.$accountId").apply()
     }
 
@@ -72,6 +94,9 @@ class AccountStore(context: Context) {
         val old = snapshot(accountId)
         if (old != null) saveSnapshot(old.copy(stale = true, errorMessage = error))
     }
+
+    private fun normalizeOrder(items: List<AccountRecord>): List<AccountRecord> =
+        items.mapIndexed { index, account -> account.copy(order = index) }
 
     private fun saveAccounts(items: List<AccountRecord>) {
         val array = JSONArray()
