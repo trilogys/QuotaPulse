@@ -8,7 +8,11 @@ actor QuotaNotifier {
   private let center = UNUserNotificationCenter.current()
 
   init() {
-    defaults = UserDefaults(suiteName: AppConfig.appGroup) ?? .standard
+    if let appGroup = AppConfig.appGroup {
+      defaults = UserDefaults(suiteName: appGroup) ?? .standard
+    } else {
+      defaults = .standard
+    }
   }
 
   func requestAuthorization() async {

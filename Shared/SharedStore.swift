@@ -12,7 +12,15 @@ actor SharedStore {
     static func snapshot(_ id: UUID) -> String { "snapshot.\(id.uuidString)" }
     static func cooldown(_ id: UUID) -> String { "cooldown.\(id.uuidString)" }
   }
-  init() { defaults = UserDefaults(suiteName: AppConfig.appGroup) ?? .standard; encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601; decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601 }
+  init() {
+    if let appGroup = AppConfig.appGroup {
+      defaults = UserDefaults(suiteName: appGroup) ?? .standard
+    } else {
+      defaults = .standard
+    }
+    encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+    decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
+  }
   func accounts() -> [AccountRecord] { guard let data=defaults.data(forKey:Key.accounts),let value=try? decoder.decode([AccountRecord].self,from:data) else{return []};return value.sorted{lhs,rhs in lhs.sortOrder != rhs.sortOrder ? lhs.sortOrder < rhs.sortOrder : lhs.createdAt < rhs.createdAt} }
   func account(id:UUID)->AccountRecord?{accounts().first{$0.id==id}}
   func saveAccounts(_ accounts:[AccountRecord]){guard let data=try? encoder.encode(accounts)else{return};defaults.set(data,forKey:Key.accounts)}

@@ -1,10 +1,16 @@
 import Foundation
 
 enum AppConfig {
-  static let version = "0.8.0"
-  static var appGroup: String {
-    (Bundle.main.object(forInfoDictionaryKey: "AIQuotaAppGroup") as? String)
-      ?? "group.com.example.aiquota.shared"
+  static let version = "0.11.0"
+  static var appGroup: String? {
+    guard
+      let value = Bundle.main.object(forInfoDictionaryKey: "AIQuotaAppGroup") as? String,
+      !value.isEmpty
+    else { return nil }
+    return value
+  }
+  static var isAppOnlyBuild: Bool {
+    Bundle.main.object(forInfoDictionaryKey: "AIQuotaSingleProfile") as? Bool ?? false
   }
   static let widgetKind = "AIQuotaWidget"
   static let keychainService = "AIQuota.Credentials"

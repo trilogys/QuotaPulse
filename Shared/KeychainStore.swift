@@ -48,6 +48,16 @@ struct KeychainStore: Sendable {
     return .available(accessGroup: group)
   }
 
+  private func credentialQuery(_ base: [String: Any]) throws -> [String: Any] {
+    if AppConfig.isAppOnlyBuild { return base }
+    guard case .available(let group) = sharedAccessStatus() else {
+      throw KeychainError.missingAccessGroup
+    }
+    var query = base
+    query[kSecAttrAccessGroup as String] = group
+    return query
+  }
+
   private func discoverDefaultAccessGroup() -> String? {
     let account = "probe.\(UUID().uuidString)"
     let base: [String: Any] = [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:"\(AppConfig.keychainService).AccessGroupProbe",kSecAttrAccount as String:account]
@@ -59,23 +69,20 @@ struct KeychainStore: Sendable {
   }
 
   func saveCredential(_ credential: Credential, accountID: UUID) throws {
-    guard case .available(let group)=sharedAccessStatus() else { throw KeychainError.missingAccessGroup }
     let encoder=JSONEncoder();encoder.dateEncodingStrategy = .iso8601;let data=try encoder.encode(credential);let account=accountID.uuidString
-    var query:[String:Any]=[kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:AppConfig.keychainService,kSecAttrAccount as String:account,kSecAttrAccessGroup as String:group]
+    var query=try credentialQuery([kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:AppConfig.keychainService,kSecAttrAccount as String:account])
     SecItemDelete(query as CFDictionary);query[kSecValueData as String]=data;query[kSecAttrAccessible as String]=kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
     let status=SecItemAdd(query as CFDictionary,nil);guard status==errSecSuccess else{throw KeychainError.unexpectedStatus(status)}
   }
 
   func credential(accountID: UUID) throws -> Credential? {
-    guard case .available(let group)=sharedAccessStatus() else { throw KeychainError.missingAccessGroup }
-    let query:[String:Any]=[kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:AppConfig.keychainService,kSecAttrAccount as String:accountID.uuidString,kSecReturnData as String:true,kSecMatchLimit as String:kSecMatchLimitOne,kSecAttrAccessGroup as String:group]
+    let query=try credentialQuery([kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:AppConfig.keychainService,kSecAttrAccount as String:accountID.uuidString,kSecReturnData as String:true,kSecMatchLimit as String:kSecMatchLimitOne])
     var result:CFTypeRef?;let status=SecItemCopyMatching(query as CFDictionary,&result);if status==errSecItemNotFound{return nil};guard status==errSecSuccess else{throw KeychainError.unexpectedStatus(status)};guard let data=result as? Data else{throw KeychainError.invalidData}
     let decoder=JSONDecoder();decoder.dateDecodingStrategy = .iso8601;return try decoder.decode(Credential.self,from:data)
   }
 
   func deleteCredential(accountID: UUID) throws {
-    guard case .available(let group)=sharedAccessStatus() else { throw KeychainError.missingAccessGroup }
-    let query:[String:Any]=[kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:AppConfig.keychainService,kSecAttrAccount as String:accountID.uuidString,kSecAttrAccessGroup as String:group]
+    let query=try credentialQuery([kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:AppConfig.keychainService,kSecAttrAccount as String:accountID.uuidString])
     let status=SecItemDelete(query as CFDictionary);guard status==errSecSuccess||status==errSecItemNotFound else{throw KeychainError.unexpectedStatus(status)}
   }
 }
