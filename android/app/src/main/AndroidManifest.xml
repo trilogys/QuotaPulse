@@ -4,7 +4,7 @@
     <application
         android:name=".AIQuotaApplication"
         android:allowBackup="false"
-        android:label="AIQuota"
+        android:label="@string/app_name"
         android:theme="@style/Theme.AIQuota">
         <activity
             android:name=".MainActivity"
