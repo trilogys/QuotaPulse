@@ -13,6 +13,16 @@ AI 服务额度监控：**原生 iOS + 原生 Android + 桌面小组件 + 多账
 
 iOS 端还保留 MiniMax、GLM / Z.ai、GitHub Copilot 等适配，后续逐步同步 Android。
 
+## Visual direction
+
+AIQuota 不直接复制某一个项目的 UI，而是组合三个方向：
+
+- **claude-widget-ios**：iOS 原生 SwiftUI / WidgetKit 的简洁信息密度与系统风格
+- **CodexBar**：额度窗口层级、session/weekly/reset 信息架构、stale/error 状态
+- **AIQuota 自身**：多账号总览、推荐账号、单账号刷新、Provider/账号级 Widget 配置
+
+最终风格原则：**原生、紧凑、额度优先、刷新状态清晰，不做重装饰 Dashboard。**
+
 ## iOS
 
 技术栈：SwiftUI + WidgetKit + App Intents + App Group + Keychain。
@@ -32,11 +42,36 @@ iOS 端还保留 MiniMax、GLM / Z.ai、GitHub Copilot 等适配，后续逐步�
 - 80% / 90% / 约 100% 已用额度分级通知，按账号/额度窗口去重
 - 主 App 首次运行请求通知权限
 - Shared `UsageService` 统一执行阈值判断，因此主 App 与 Widget/App Intent 刷新共用同一规则
-- GitHub Actions 构建 unsigned / signed IPA
+- GitHub Actions 构建 unsigned / re-sign / P12 signed IPA
 
 Codex 使用 browser OAuth + PKCE + iPhone 本机 localhost callback；日常刷新不依赖电脑或中转服务器。
 
 最新 iOS Simulator CI 已验证通知权限、Shared 通知器、UsageService 接入与账号排序均可编译通过。
+
+### iOS 安装/签名
+
+`Actions → ipa` 支持两类产物：
+
+```text
+AIQuota-iOS-resign
+├─ AIQuota-resign.ipa
+├─ AIQuota-unsigned.ipa
+├─ SHA256
+└─ signing-info
+
+AIQuota-signed-release-testing / debugging
+└─ AIQuota-signed.ipa
+```
+
+`AIQuota-resign.ipa` 是标准 IPA，可作为全能签、ESign、爱思助手等第三方签名/安装工具的输入。由于 AIQuota 包含 Widget Extension，签名工具必须同时正确签名主 App 与 `AIQuotaWidget.appex`，并处理匹配的 App Group / Keychain entitlements。
+
+P12 模式需要：
+
+- `.p12` + 密码
+- 主 App `.mobileprovision`
+- Widget `.mobileprovision`
+
+GitHub Actions 会自动解析 Team / Bundle ID / App Group、验证 profile 兼容性并生成签名 IPA。详见 `IPA.md` / `SIGNING.md`。
 
 ## Android
 
@@ -166,6 +201,7 @@ AIQuota-Android-release/app-release.apk
 - Android：OAuth token / API Key 存 EncryptedSharedPreferences，主密钥由 Android Keystore 管理
 - 普通账号配置和 Widget snapshot 不保存 token
 - Android release keystore/password 不进入 Git 仓库
+- iOS P12/profile/password 只通过 GitHub Actions Secrets 注入
 - 日志、Widget、错误提示不应输出完整 token、refresh token、Cookie 或 API Key
 
 ## 项目结构
@@ -179,14 +215,14 @@ android/
   app/src/main/java/.../core/     Account / Credential / Provider / Usage
   app/src/main/java/.../widget/   Glance Widget / config / refresh action
   app/src/main/java/.../work/     WorkManager / quota alerts
-.github/workflows/ipa.yml         iOS IPA
+.github/workflows/ipa.yml         iOS unsigned/re-sign/P12 signed IPA
 .github/workflows/android.yml     Android debug/release APK
-Scripts/                          iOS 构建/签名脚本
+Scripts/                          iOS 构建/签名/结构验证脚本
 ```
 
 ## 构建
 
-iOS：`Actions → ipa → Run workflow`，支持 unsigned IPA 和 p12 + mobileprovision signed IPA，详见 `IPA.md` / `SIGNING.md`。
+iOS：`Actions → ipa → Run workflow`，支持第三方重签 IPA 和 p12 + mobileprovision signed IPA，详见 `IPA.md` / `SIGNING.md`。
 
 Android：`Actions → Android → Run workflow`。默认下载 `AIQuota-Android-debug`；配置签名 Secrets 后还会生成 `AIQuota-Android-release`。
 
