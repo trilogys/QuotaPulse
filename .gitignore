@@ -15,3 +15,9 @@ build/
 *.ipa
 xcuserdata/
 *.xcuserstate
+
+# Android / Gradle
+.gradle/
+android/.gradle/
+android/local.properties
+android/*.keystore

@@ -27,6 +27,8 @@ AIQuota 不直接复制某一个项目的 UI，而是组合三个方向：
 
 技术栈：SwiftUI + WidgetKit + App Intents + App Group + Keychain。
 
+系统要求：**iOS 16.0 以上**。iOS 16 使用静态 Widget，点按后进入 App 刷新；iOS 17 以上自动启用可配置 Widget 和小组件内原地刷新。
+
 当前支持：
 
 - Codex / Claude / Kimi OAuth
@@ -56,6 +58,8 @@ Codex 使用 browser OAuth + PKCE + iPhone 本机 localhost callback；日常刷
 AIQuota-iOS-resign
 ├─ AIQuota-resign.ipa
 ├─ AIQuota-unsigned.ipa
+├─ AIQuota-app-only-resign.ipa
+├─ AIQuota-app-only-unsigned.ipa
 ├─ SHA256
 └─ signing-info
 
@@ -63,19 +67,25 @@ AIQuota-signed-release-testing / debugging
 └─ AIQuota-signed.ipa
 ```
 
-`AIQuota-resign.ipa` 是标准 IPA，可作为全能签、ESign、爱思助手等第三方签名/安装工具的输入。包内真实包含：
+只有 P12/一套描述文件，或使用全能签、爱思助手等兼容性不明确的工具时，优先使用 `AIQuota-app-only-resign.ipa`。它不包含 Widget Extension，不要求 App Group，只需正确签名主 App。
+
+`AIQuota-resign.ipa` 是包含 Widget 的标准 IPA。包内真实包含：
 
 ```text
 Payload/AIQuota.app/PlugIns/AIQuotaWidget.appex
 ```
 
-因此重签工具需要同时正确签名主 App 与 Widget Extension，并处理匹配的 App Group / Keychain entitlements。当前 GitHub Actions 已真实验证 unsigned/re-sign IPA 构建、Widget 嵌入和 artifact 上传成功。
+因此重签工具需要同时正确签名主 App 与 Widget Extension，并处理匹配的 App Group / Keychain entitlements。GitHub Actions 会验证 unsigned/re-sign IPA 的结构、Widget 嵌入和 artifact 输出。
+
+> `.p12` 只包含签名证书和私钥，不能单独生成可安装 IPA；仍需与 Bundle ID 匹配的 provisioning profile。全能签等工具若能正常签名，通常是工具中还导入或生成了对应 profile。
 
 P12 模式需要：`.p12` + 密码、主 App `.mobileprovision`、Widget `.mobileprovision`。GitHub Actions 会解析 Team / Bundle ID / App Group、验证 profile 兼容性并生成签名 IPA。详见 `IPA.md` / `SIGNING.md`。
 
 ## Android
 
 技术栈：Kotlin + Jetpack Compose + Jetpack Glance + WorkManager + Android Keystore/EncryptedSharedPreferences。
+
+系统要求：Android 8.0（API 26）以上。`Actions → Android` 的 `AIQuota-Android-debug/app-debug.apk` 可直接侧载；配置固定 release keystore 后生成的 release APK 才能在后续版本中稳定覆盖安装。两个 artifact 都同时提供 `.sha256` 校验文件。
 
 当前支持：
 

@@ -11,5 +11,5 @@ AIQUOTA_KEYCHAIN_SUFFIX = app.apricot6065.celery3385
 // Optional signing overrides live in a git-ignored local file.
 #include? "SigningConfig.xcconfig"
 
-IPHONEOS_DEPLOYMENT_TARGET = 17.0
+IPHONEOS_DEPLOYMENT_TARGET = 16.0
 SWIFT_VERSION = 5.9

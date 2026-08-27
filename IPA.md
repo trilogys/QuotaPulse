@@ -1,13 +1,14 @@
-# IPA quick start — v0.10.0
+# IPA quick start
 
-AIQuota iOS 包保持标准 IPA 结构，并同时提供两种发行方式：
+AIQuota 支持 iOS 16.0 以上，并提供三种发行方式：
 
-1. **unsigned / re-sign IPA**：给全能签、ESign、爱思助手或其它第三方签名工具重新签名。
-2. **P12 + mobileprovision signed IPA**：GitHub Actions 或 macOS 构建时直接使用自己的证书和描述文件签名。
+1. **App-only unsigned / re-sign IPA**：只有一套签名材料或使用全能签、爱思助手时的首选，不含 Widget。
+2. **Full unsigned / re-sign IPA**：包含 Widget，重签工具必须能处理 App Extension 和两份 profile。
+3. **P12 + mobileprovision signed IPA**：GitHub Actions 或 macOS 直接签名完整 Widget 版。
 
-AIQuota 包含主 App 和 Widget Extension，因此签名工具必须正确处理两个 bundle。
+> P12 只是证书与私钥。任何 iOS 安装方式还需要与 Bundle ID、设备/分发方式匹配的 provisioning profile；P12 不能代替 profile。
 
-## 1. Unsigned / re-sign IPA
+## 1. 全能签 / 爱思助手推荐路径
 
 1. 打开 **Actions → ipa → Run workflow**。
 2. 选择 `build_type = unsigned`。
@@ -16,11 +17,32 @@ AIQuota 包含主 App 和 Widget Extension，因此签名工具必须正确处�
 
 Artifact 包含：
 
-- `AIQuota-resign.ipa` — 推荐直接交给第三方重签工具
+- `AIQuota-resign.ipa` — 包含 Widget，仅用于支持 Extension 的重签工具
 - `AIQuota-resign.ipa.sha256`
 - `AIQuota-unsigned.ipa` — 与 resign 版内容相同的通用命名
 - `AIQuota-unsigned.ipa.sha256`
 - `AIQuota-unsigned-signing-info.txt`
+- `AIQuota-app-only-resign.ipa` — **单 App 兼容版，优先用于全能签/爱思助手**
+- `AIQuota-app-only-unsigned.ipa`
+- `AIQuota-app-only-signing-info.txt`
+
+选择规则：
+
+```text
+只有 P12 + 一份主 App profile
+  → AIQuota-app-only-resign.ipa
+  → 在签名工具中导入 P12、密码和 profile
+  → 签名后安装
+
+有主 App + Widget 两份 profile，且工具支持 Extension
+  → AIQuota-resign.ipa
+  → 同时签名 AIQuota.app 与 AIQuotaWidget.appex
+  → 安装后检查小组件列表
+```
+
+App-only 包保留账号、OAuth、额度查询、通知、导入导出和 App 内刷新，只移除桌面 Widget。它不需要 App Group 或共享 Keychain entitlement，因此对单 profile 签名最稳妥。
+
+## 2. Full unsigned / re-sign IPA
 
 IPA 是真实 iphoneos 构建，标准结构：
 
@@ -55,9 +77,9 @@ AIQuota 使用标准 IPA 结构，因此可以作为爱思助手等桌面签名/
 4. 两个 profile 是否允许对应 App Group；
 5. 主 App / Widget bundle ID 是否与 profile 匹配。
 
-> AIQuota 不依赖某个私有签名工具的特殊格式；它输出的是标准 IPA。只要签名工具能正确处理 App Extension，就可以工作。
+> AIQuota 不依赖某个私有签名工具的特殊格式；它输出的是标准 IPA。若工具不能处理 Extension，请改用 `AIQuota-app-only-resign.ipa`。
 
-## 2. P12 + mobileprovision signed IPA
+## 3. P12 + mobileprovision signed IPA
 
 这是保留 Widget 功能最稳妥的方式。
 
@@ -107,7 +129,7 @@ P12
 AIQuota-signed.ipa
 ```
 
-## 3. One-command local signed IPA on macOS
+## 4. One-command local signed IPA on macOS
 
 ```bash
 brew install xcodegen
@@ -127,7 +149,7 @@ build/export/AIQuota-signed.ipa
 build/export/AIQuota-signed.ipa.sha256
 ```
 
-## 4. Why two provisioning profiles?
+## 5. Why two provisioning profiles?
 
 AIQuota 不是只有一个 App：
 
@@ -141,7 +163,7 @@ Apple 把 Widget Extension 当成独立签名 bundle，因此 Widget 一般需�
 
 这也是为什么某些“一键签名”工具看起来签名成功、App 也能打开，但桌面小组件没有出现。
 
-## 5. Runtime credential sharing
+## 6. Runtime credential sharing
 
 AIQuota 的 OAuth token / API Key 存在共享 Keychain 中；App 和 Widget 通过 App Group / Keychain entitlement 协作。
 
@@ -152,26 +174,30 @@ unsigned IPA 无法预先知道最终 Apple application-identifier prefix，所�
 如果主要是自己手机使用：
 
 ```text
+只有一份主 App profile / 不需要小组件
+        → AIQuota-app-only-resign.ipa
+        → 全能签或爱思助手导入 P12 + profile 后签名安装
+
 已有 P12 + 主 App profile + Widget profile
         → GitHub Actions signed IPA
         → 直接安装
 ```
 
-如果只拿到 P12/描述文件后习惯使用手机签名工具：
+如果只有 P12 + 一份主 App profile，并习惯使用手机签名工具：
 
 ```text
-Actions 下载 AIQuota-resign.ipa
-        → 全能签 / ESign / 其它支持 Extension 的工具
-        → 同时签 App + Widget
+Actions 下载 AIQuota-app-only-resign.ipa
+        → 全能签 / ESign
+        → 签名主 App
         → 安装
 ```
 
 如果使用爱思助手：
 
 ```text
-Actions 下载 AIQuota-resign.ipa
+Actions 下载 AIQuota-app-only-resign.ipa
         → 爱思助手签名/安装
-        → 安装后确认“添加小组件”列表中存在 AIQuota
+        → 安装并在 App 内刷新
 ```
 
 若 App 能安装但 Widget 不存在，应先判断为 **Extension 签名/entitlement 问题**，而不是额度 Provider 或 OAuth 代码问题。
