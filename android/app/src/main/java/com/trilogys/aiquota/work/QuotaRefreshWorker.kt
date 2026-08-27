@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.trilogys.aiquota.core.AccountStore
 import com.trilogys.aiquota.core.CredentialStore
+import com.trilogys.aiquota.core.QuotaNotifier
 import com.trilogys.aiquota.core.UsageService
 import com.trilogys.aiquota.widget.AIQuotaWidget
 import com.trilogys.aiquota.widget.WidgetConfigStore
@@ -19,6 +20,7 @@ class QuotaRefreshWorker(
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val accountStore = AccountStore(applicationContext)
         val usageService = UsageService(CredentialStore(applicationContext))
+        val notifier = QuotaNotifier(applicationContext)
         val appWidgetId = inputData.getInt(KEY_APP_WIDGET_ID, -1)
         val config = if (appWidgetId >= 0) WidgetConfigStore(applicationContext).get(appWidgetId) else null
         val enabledAccounts = accountStore.accounts().filter { it.enabled }
@@ -33,7 +35,11 @@ class QuotaRefreshWorker(
         var hadSuccess = false
         targets.forEach { account ->
             runCatching { usageService.refresh(account) }
-                .onSuccess { accountStore.saveSnapshot(it); hadSuccess = true }
+                .onSuccess {
+                    accountStore.saveSnapshot(it)
+                    notifier.evaluate(account, it)
+                    hadSuccess = true
+                }
                 .onFailure { accountStore.markStale(account.id, it.message ?: "Refresh failed") }
         }
         AIQuotaWidget().updateAll(applicationContext)
