@@ -235,7 +235,7 @@ class OAuthManager(
 
     private fun kimiDeviceHeaders(): Map<String, String> = mapOf(
         "X-Msh-Platform" to "kimi_cli",
-        "X-Msh-Version" to "ai-quota-native/0.9.0",
+        "X-Msh-Version" to "ai-quota-native/0.11.0",
         "X-Msh-Device-Name" to Build.MODEL,
         "X-Msh-Device-Model" to Build.DEVICE,
         "X-Msh-Os-Version" to Build.VERSION.RELEASE,
