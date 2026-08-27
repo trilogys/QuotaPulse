@@ -40,8 +40,10 @@
 "点小组件进入设置" = "点小组件进入设置";
 "等待首次刷新" = "等待首次刷新";
 "刷新全部额度" = "刷新全部额度";
+"刷新当前小组件" = "刷新当前小组件";
 "不可用" = "不可用";
 "Codex、Claude、Kimi 等 AI 额度。支持在小组件内直接刷新。" = "Codex、Claude、Kimi 等 AI 额度。支持在小组件内直接刷新。";
+"Codex、Claude、Kimi 等 AI 额度。支持单 Provider、单账号和小组件内刷新。" = "Codex、Claude、Kimi 等 AI 额度。支持单 Provider、单账号和小组件内刷新。";
 "正常" = "正常";
 "即将续期" = "即将续期";
 "可续期" = "可续期";
@@ -57,3 +59,9 @@
 "MiniMax · Coding Key" = "MiniMax · Coding Key";
 "GLM · Coding Key" = "GLM · Coding Key";
 "GitHub Copilot · Token" = "GitHub Copilot · Token";
+"显示范围" = "显示范围";
+"全部账号" = "全部账号";
+"单 Provider" = "单 Provider";
+"单账号" = "单账号";
+"配置 AIQuota 小组件" = "配置 AIQuota 小组件";
+"选择显示全部账号、单个 Provider 或单个账号。" = "选择显示全部账号、单个 Provider 或单个账号。";
