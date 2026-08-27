@@ -25,21 +25,24 @@ final class AppModel: ObservableObject {
 
   func addCodex(presenter: UIViewController) async {
     await performBusy {
-      let credential = try await CodexOAuthCoordinator().login(presenting: presenter)
+      let coordinator = CodexOAuthCoordinator()
+      let credential = try await coordinator.login(presenting: presenter)
       try await saveCredential(credential, provider: .codex)
     }
   }
 
   func addClaude(presenter: UIViewController) async {
     await performBusy {
-      let credential = try await ClaudeOAuthCoordinator().login(presenting: presenter)
+      let coordinator = ClaudeOAuthCoordinator()
+      let credential = try await coordinator.login(presenting: presenter)
       try await saveCredential(credential, provider: .claude)
     }
   }
 
   func addKimi(presenter: UIViewController) async {
     await performBusy {
-      let credential = try await KimiOAuthCoordinator().login(presenting: presenter)
+      let coordinator = KimiOAuthCoordinator()
+      let credential = try await coordinator.login(presenting: presenter)
       try await saveCredential(credential, provider: .kimi)
     }
   }
