@@ -27,35 +27,16 @@ struct ContentView: View {
                 recommended: recommendedAccountIDs.contains(account.id),
                 health: model.credentialHealth(account),
                 onRefresh: { await model.refresh(account) },
+                onReauth: { await reauthenticate(account) },
                 onToggle: { enabled in await model.setEnabled(account, enabled: enabled) }
               )
               .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                Button(role: .destructive) {
-                  Task { await model.delete(account) }
-                } label: {
-                  Label("删除", systemImage: "trash")
-                }
-                Button {
-                  renameTarget = account
-                  renameText = account.label
-                } label: {
-                  Label("重命名", systemImage: "pencil")
-                }
-                .tint(.blue)
+                Button(role: .destructive) { Task { await model.delete(account) } } label: { Label("删除", systemImage: "trash") }
+                Button { renameTarget = account; renameText = account.label } label: { Label("重命名", systemImage: "pencil") }.tint(.blue)
               }
               .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                Button {
-                  Task { await model.move(account, offset: -1) }
-                } label: {
-                  Label("上移", systemImage: "arrow.up")
-                }
-                .tint(.indigo)
-                Button {
-                  Task { await model.move(account, offset: 1) }
-                } label: {
-                  Label("下移", systemImage: "arrow.down")
-                }
-                .tint(.teal)
+                Button { Task { await model.move(account, offset: -1) } } label: { Label("上移", systemImage: "arrow.up") }.tint(.indigo)
+                Button { Task { await model.move(account, offset: 1) } } label: { Label("下移", systemImage: "arrow.down") }.tint(.teal)
               }
             }
           }
@@ -64,13 +45,7 @@ struct ContentView: View {
             Text("账号")
             Spacer()
             if !model.accounts.isEmpty {
-              Button {
-                Task { await model.refreshAll() }
-              } label: {
-                Label("全部刷新", systemImage: "arrow.clockwise")
-                  .labelStyle(.iconOnly)
-              }
-              .disabled(model.isBusy)
+              Button { Task { await model.refreshAll() } } label: { Label("全部刷新", systemImage: "arrow.clockwise").labelStyle(.iconOnly) }.disabled(model.isBusy)
             }
           }
         }
@@ -78,15 +53,11 @@ struct ContentView: View {
         Section("小组件") {
           Label("小组件中的 ↻ 会原地刷新，不打开 App", systemImage: "arrow.clockwise.circle")
           Label("普通点小组件区域才会进入这里", systemImage: "hand.tap")
-        }
-        .font(.footnote)
-        .foregroundStyle(.secondary)
+        }.font(.footnote).foregroundStyle(.secondary)
       }
       .navigationTitle("AI Quota")
       .toolbar {
-        ToolbarItem(placement: .topBarLeading) {
-          Button { showingSettings = true } label: { Image(systemName: "gearshape") }
-        }
+        ToolbarItem(placement: .topBarLeading) { Button { showingSettings = true } label: { Image(systemName: "gearshape") } }
         ToolbarItem(placement: .topBarTrailing) {
           Menu {
             Button("Codex · ChatGPT 登录") { loginOAuth(.codex) }
@@ -104,9 +75,7 @@ struct ContentView: View {
         if model.isBusy {
           ZStack {
             Color.black.opacity(0.08).ignoresSafeArea()
-            ProgressView("处理中…")
-              .padding(18)
-              .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+            ProgressView("处理中…").padding(18).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
           }
         }
       }
@@ -118,15 +87,10 @@ struct ContentView: View {
       .alert("重命名账号", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
         TextField("账号名称", text: $renameText)
         Button("取消", role: .cancel) { renameTarget = nil }
-        Button("保存") {
-          if let target = renameTarget { Task { await model.rename(target, label: renameText) } }
-          renameTarget = nil
-        }
+        Button("保存") { if let target = renameTarget { Task { await model.rename(target, label: renameText) } }; renameTarget = nil }
       }
       .sheet(item: $apiProvider) { provider in
-        APIKeyEntryView(provider: provider) { key, baseURL in
-          await model.addAPIKey(provider: provider, key: key, baseURL: baseURL)
-        }
+        APIKeyEntryView(provider: provider) { key, baseURL in await model.addAPIKey(provider: provider, key: key, baseURL: baseURL) }
       }
       .sheet(isPresented: $showingSettings) { SettingsView(model: model) }
     }
@@ -147,10 +111,7 @@ struct ContentView: View {
 
   private func loginOAuth(_ provider: ProviderID) {
     Task { @MainActor in
-      guard let presenter = UIApplication.shared.activeTopViewController() else {
-        model.errorMessage = "无法打开登录页面"
-        return
-      }
+      guard let presenter = UIApplication.shared.activeTopViewController() else { model.errorMessage = "无法打开登录页面"; return }
       switch provider {
       case .codex: await model.addCodex(presenter: presenter)
       case .claude: await model.addClaude(presenter: presenter)
@@ -158,6 +119,18 @@ struct ContentView: View {
       default: break
       }
     }
+  }
+
+  private func reauthenticate(_ account: AccountRecord) async {
+    guard [.codex, .claude, .kimi].contains(account.provider) else {
+      await MainActor.run { apiProvider = account.provider }
+      return
+    }
+    guard let presenter = await MainActor.run(body: { UIApplication.shared.activeTopViewController() }) else {
+      await MainActor.run { model.errorMessage = "无法打开重新认证页面" }
+      return
+    }
+    await model.reauthenticate(account, presenter: presenter)
   }
 }
 
@@ -167,8 +140,10 @@ private struct AccountRow: View {
   let recommended: Bool
   let health: CredentialHealth
   let onRefresh: () async -> Void
+  let onReauth: () async -> Void
   let onToggle: (Bool) async -> Void
   @State private var refreshing = false
+  @State private var reauthing = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -176,36 +151,42 @@ private struct AccountRow: View {
         VStack(alignment: .leading, spacing: 2) {
           HStack(spacing: 5) {
             Text(account.label).font(.headline)
-            if recommended {
-              Label("推荐", systemImage: "star.fill").labelStyle(.iconOnly).foregroundStyle(.yellow).accessibilityLabel("推荐账号")
-            }
+            if recommended { Label("推荐", systemImage: "star.fill").labelStyle(.iconOnly).foregroundStyle(.yellow).accessibilityLabel("推荐账号") }
           }
           HStack(spacing: 6) {
             Text(account.provider.title)
-            Label(health.title, systemImage: health.icon)
-              .foregroundStyle(health.color)
-          }
-          .font(.caption)
+            Label(health.title, systemImage: health.icon).foregroundStyle(health.color)
+          }.font(.caption)
         }
         Spacer()
         Toggle("显示", isOn: Binding(get: { account.isEnabled }, set: { value in Task { await onToggle(value) } })).labelsHidden()
         Button {
           refreshing = true
           Task { await onRefresh(); refreshing = false }
-        } label: {
-          if refreshing { ProgressView().controlSize(.small) } else { Image(systemName: "arrow.clockwise") }
-        }.buttonStyle(.borderless)
+        } label: { refreshing ? AnyView(ProgressView().controlSize(.small)) : AnyView(Image(systemName: "arrow.clockwise")) }
+        .buttonStyle(.borderless)
       }
 
       if let snapshot { SnapshotSummary(snapshot: snapshot) }
       else { Text("尚未获取额度").font(.caption).foregroundStyle(.secondary) }
+
+      HStack {
+        Button {
+          reauthing = true
+          Task { await onReauth(); reauthing = false }
+        } label: {
+          Label(reauthing ? "认证中…" : "重新认证", systemImage: "person.badge.key")
+        }
+        .buttonStyle(.borderless)
+        .font(.caption)
+        Spacer()
+      }
     }.padding(.vertical, 3)
   }
 }
 
 private struct SnapshotSummary: View {
   let snapshot: UsageSnapshot
-
   var body: some View {
     if let balance = snapshot.balance {
       HStack { Text("余额"); Spacer(); Text("\(balance.symbol)\(balance.total, specifier: "%.2f")").fontWeight(.semibold) }.font(.subheadline)
@@ -227,7 +208,6 @@ private struct SnapshotSummary: View {
     } else {
       HStack { ForEach(snapshot.metrics.prefix(2)) { metric in Text("\(metric.label)：\(metric.value)") } }.font(.caption)
     }
-
     HStack(spacing: 6) {
       Text("更新 \(snapshot.fetchedAt.formatted(date: .omitted, time: .shortened))")
       if snapshot.stale { Text("缓存").foregroundStyle(.orange) }
@@ -236,20 +216,11 @@ private struct SnapshotSummary: View {
 }
 
 private func resetCountdown(_ date: Date) -> String {
-  let seconds = max(0, Int(date.timeIntervalSinceNow))
-  let days = seconds / 86400
-  let hours = (seconds % 86400) / 3600
-  let minutes = (seconds % 3600) / 60
-  if days > 0 { return "\(days)天 \(hours)小时" }
-  if hours > 0 { return "\(hours)小时 \(minutes)分" }
-  return "\(max(1, minutes))分"
+  let seconds = max(0, Int(date.timeIntervalSinceNow)); let days = seconds / 86400; let hours = (seconds % 86400) / 3600; let minutes = (seconds % 3600) / 60
+  if days > 0 { return "\(days)天 \(hours)小时" }; if hours > 0 { return "\(hours)小时 \(minutes)分" }; return "\(max(1, minutes))分"
 }
 
-struct CredentialHealth {
-  let title: String
-  let icon: String
-  let color: Color
-}
+struct CredentialHealth { let title: String; let icon: String; let color: Color }
 
 struct SettingsView: View {
   @ObservedObject var model: AppModel
@@ -271,15 +242,12 @@ struct SettingsView: View {
             let health = model.credentialHealth(account)
             HStack {
               VStack(alignment: .leading) { Text(account.label); Text(account.provider.title).font(.caption).foregroundStyle(.secondary) }
-              Spacer()
-              Label(health.title, systemImage: health.icon).foregroundStyle(health.color).font(.caption)
+              Spacer(); Label(health.title, systemImage: health.icon).foregroundStyle(health.color).font(.caption)
             }
           }
         }
         Section("显示账号") {
-          ForEach(model.accounts) { account in
-            Toggle(account.label, isOn: Binding(get: { account.isEnabled }, set: { value in Task { await model.setEnabled(account, enabled: value) } }))
-          }
+          ForEach(model.accounts) { account in Toggle(account.label, isOn: Binding(get: { account.isEnabled }, set: { value in Task { await model.setEnabled(account, enabled: value) } })) }
         }
       }
       .navigationTitle("设置")
