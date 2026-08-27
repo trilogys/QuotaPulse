@@ -23,9 +23,15 @@ Options:
   --output DIR             Output directory (default build/unsigned-export)
 
 This builds a real iphoneos .app + Widget .appex without a code signature and
-packages them into Payload/AIQuota.app as AIQuota-unsigned.ipa. It must run on
-macOS with Xcode. The resulting IPA is intended for a re-signing tool that can
-sign BOTH the app and Widget extension with compatible entitlements/profiles.
+packages them into Payload/AIQuota.app. It produces two identical IPA files:
+
+  AIQuota-unsigned.ipa  generic unsigned artifact
+  AIQuota-resign.ipa    clearly named for third-party re-signing tools
+
+The resulting IPA is intended for tools such as ESign/全能签 and desktop
+re-signing utilities. A compatible signer must sign BOTH the main .app and the
+embedded Widget .appex with provisioning profiles that authorize matching App
+Group and shared Keychain entitlements.
 USAGE
 }
 
@@ -82,25 +88,40 @@ mkdir -p "$STAGE/Payload"
 ditto "$APP" "$STAGE/Payload/AIQuota.app"
 
 IPA="$ROOT/$OUT_DIR/AIQuota-unsigned.ipa"
+RESIGN_IPA="$ROOT/$OUT_DIR/AIQuota-resign.ipa"
 (
   cd "$STAGE"
   /usr/bin/zip -qry "$IPA" Payload
 )
+cp "$IPA" "$RESIGN_IPA"
 
 cat > "$ROOT/$OUT_DIR/AIQuota-unsigned-signing-info.txt" <<INFO
-AI Quota Native unsigned IPA
-Version: 0.8.0
+AIQuota Native unsigned / re-sign IPA
+Version: 0.10.0
 Main bundle ID: $APP_BUNDLE
 Widget bundle ID: $WIDGET_BUNDLE
 App Group expected at runtime: $APP_GROUP
 Keychain suffix expected at runtime: $KEYCHAIN_SUFFIX
 
-IMPORTANT:
-- Sign Payload/AIQuota.app AND Payload/AIQuota.app/PlugIns/*.appex.
-- Main app and widget provisioning profiles must authorize the same App Group.
-- Both profiles must authorize a compatible shared Keychain access group.
-- A generic one-profile re-sign may install the app but break the widget.
+Artifacts:
+- AIQuota-unsigned.ipa : generic unsigned IPA
+- AIQuota-resign.ipa   : identical copy named for third-party re-signing
+
+IMPORTANT FOR 全能签 / ESign / 爱思助手 / OTHER RE-SIGN TOOLS:
+- The IPA uses standard Payload/AIQuota.app packaging.
+- The Widget is embedded at Payload/AIQuota.app/PlugIns/AIQuotaWidget.appex.
+- The signer must sign BOTH the main app and the embedded Widget extension.
+- The main app and Widget may require separate provisioning profiles.
+- Both profiles must authorize the SAME App Group used by this build.
+- Both profiles must authorize compatible shared Keychain access groups.
+- If a re-sign tool only replaces the main-app profile/signature, the app may
+  install while the Widget fails to appear or fails to share credentials.
+- Re-signing cannot add an App Group that your Apple provisioning profile does
+  not authorize. Use bundle IDs/App Group matching the profiles when possible.
 INFO
 
 "$ROOT/Scripts/verify_ipa_structure.sh" "$IPA" unsigned
-printf '\nUnsigned IPA: %s\n' "$IPA"
+"$ROOT/Scripts/verify_ipa_structure.sh" "$RESIGN_IPA" unsigned
+shasum -a 256 "$IPA" > "$IPA.sha256"
+shasum -a 256 "$RESIGN_IPA" > "$RESIGN_IPA.sha256"
+printf '\nUnsigned IPA: %s\nRe-sign IPA: %s\n' "$IPA" "$RESIGN_IPA"
