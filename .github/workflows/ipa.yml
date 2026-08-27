@@ -1,0 +1,126 @@
+name: ipa
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: IPA type
+        required: true
+        default: unsigned
+        type: choice
+        options:
+          - unsigned
+          - signed
+      distribution:
+        description: Signed IPA distribution method (ignored for unsigned)
+        required: true
+        default: release-testing
+        type: choice
+        options:
+          - release-testing
+          - debugging
+      unsigned_bundle_id:
+        description: Bundle ID for unsigned IPA before re-signing
+        required: false
+        default: com.example.aiquota
+        type: string
+      unsigned_widget_bundle_id:
+        description: Widget Bundle ID (blank = <bundle>.widget)
+        required: false
+        type: string
+      unsigned_app_group:
+        description: App Group embedded in unsigned build (blank = group.<bundle>.shared)
+        required: false
+        type: string
+      unsigned_keychain_suffix:
+        description: Keychain suffix embedded in unsigned build (blank = <bundle>.shared)
+        required: false
+        type: string
+
+# Signed mode repository secrets:
+#   AIQUOTA_P12_BASE64
+#   AIQUOTA_P12_PASSWORD
+#   AIQUOTA_APP_PROFILE_BASE64
+#   AIQUOTA_WIDGET_PROFILE_BASE64
+# Bundle IDs, Team ID, App Group, Keychain group and profile names are derived
+# from the two provisioning profiles; no identifier secret/input is required.
+
+jobs:
+  unsigned:
+    if: ${{ inputs.build_type == 'unsigned' }}
+    runs-on: macos-15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Build unsigned device IPA
+        env:
+          APP_BUNDLE: ${{ inputs.unsigned_bundle_id }}
+          WIDGET_BUNDLE: ${{ inputs.unsigned_widget_bundle_id }}
+          APP_GROUP: ${{ inputs.unsigned_app_group }}
+          KEYCHAIN_SUFFIX: ${{ inputs.unsigned_keychain_suffix }}
+        run: |
+          set -euo pipefail
+          args=(--bundle "$APP_BUNDLE")
+          [[ -n "$WIDGET_BUNDLE" ]] && args+=(--widget-bundle "$WIDGET_BUNDLE")
+          [[ -n "$APP_GROUP" ]] && args+=(--app-group "$APP_GROUP")
+          [[ -n "$KEYCHAIN_SUFFIX" ]] && args+=(--keychain-suffix "$KEYCHAIN_SUFFIX")
+          ./Scripts/build_unsigned_ipa.sh "${args[@]}"
+          shasum -a 256 build/unsigned-export/AIQuota-unsigned.ipa > build/unsigned-export/AIQuota-unsigned.ipa.sha256
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: AIQuota-unsigned
+          path: |
+            build/unsigned-export/AIQuota-unsigned.ipa
+            build/unsigned-export/AIQuota-unsigned.ipa.sha256
+            build/unsigned-export/AIQuota-unsigned-signing-info.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  signed:
+    if: ${{ inputs.build_type == 'signed' }}
+    runs-on: macos-15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Materialize signing assets
+        env:
+          P12_BASE64: ${{ secrets.AIQUOTA_P12_BASE64 }}
+          APP_PROFILE_BASE64: ${{ secrets.AIQUOTA_APP_PROFILE_BASE64 }}
+          WIDGET_PROFILE_BASE64: ${{ secrets.AIQUOTA_WIDGET_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          [[ -n "$P12_BASE64" && -n "$APP_PROFILE_BASE64" && -n "$WIDGET_PROFILE_BASE64" ]] || {
+            echo 'Missing one or more signing secrets.' >&2; exit 1;
+          }
+          echo "$P12_BASE64" | base64 -D > "$RUNNER_TEMP/certificate.p12"
+          echo "$APP_PROFILE_BASE64" | base64 -D > "$RUNNER_TEMP/app.mobileprovision"
+          echo "$WIDGET_PROFILE_BASE64" | base64 -D > "$RUNNER_TEMP/widget.mobileprovision"
+
+      - name: Build signed IPA from certificate and profiles
+        env:
+          P12_PASSWORD: ${{ secrets.AIQUOTA_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          ./Scripts/build_signed_ipa.sh \
+            "$RUNNER_TEMP/certificate.p12" \
+            "$RUNNER_TEMP/app.mobileprovision" \
+            "$RUNNER_TEMP/widget.mobileprovision" \
+            '${{ inputs.distribution }}'
+
+      - name: Upload signed IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: AIQuota-signed-${{ inputs.distribution }}
+          path: |
+            build/export/AIQuota-signed.ipa
+            build/export/AIQuota-signed.ipa.sha256
+          if-no-files-found: error
+          retention-days: 14

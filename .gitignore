@@ -1,0 +1,17 @@
+# Local signing configuration / secrets
+SigningConfig.xcconfig
+*.p12
+*.pfx
+*.cer
+*.mobileprovision
+*.provisionprofile
+*.key
+*.pem
+
+# Xcode
+DerivedData/
+build/
+*.xcarchive
+*.ipa
+xcuserdata/
+*.xcuserstate

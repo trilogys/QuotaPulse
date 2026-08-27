@@ -1,0 +1,78 @@
+name: AIQuota
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+configFiles:
+  Debug: Config.xcconfig
+  Release: Config.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: 5.9
+    IPHONEOS_DEPLOYMENT_TARGET: 17.0
+    DEVELOPMENT_TEAM: $(AIQUOTA_TEAM_ID)
+    CODE_SIGN_STYLE: $(AIQUOTA_CODE_SIGN_STYLE)
+
+targets:
+  AIQuotaApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: Shared
+      - path: AIQuotaApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(AIQUOTA_APP_BUNDLE_ID)
+        CODE_SIGN_ENTITLEMENTS: AIQuotaApp/AIQuotaApp.entitlements
+        PROVISIONING_PROFILE_SPECIFIER: $(AIQUOTA_APP_PROFILE_SPECIFIER)
+        INFOPLIST_KEY_CFBundleDisplayName: AI Quota
+        INFOPLIST_KEY_AIQuotaAppGroup: $(AIQUOTA_APP_GROUP)
+        INFOPLIST_KEY_AIQuotaKeychainSuffix: $(AIQUOTA_KEYCHAIN_SUFFIX)
+        INFOPLIST_KEY_UILaunchScreen_Generation: true
+        GENERATE_INFOPLIST_FILE: true
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+    info:
+      path: AIQuotaApp/Info.plist
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLName: AIQuota
+            CFBundleURLSchemes:
+              - aiquota
+    dependencies:
+      - target: AIQuotaWidget
+        embed: true
+
+  AIQuotaWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Shared
+      - path: AIQuotaWidget
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(AIQUOTA_WIDGET_BUNDLE_ID)
+        CODE_SIGN_ENTITLEMENTS: AIQuotaWidget/AIQuotaWidget.entitlements
+        PROVISIONING_PROFILE_SPECIFIER: $(AIQUOTA_WIDGET_PROFILE_SPECIFIER)
+        INFOPLIST_KEY_CFBundleDisplayName: AI Quota Widget
+        INFOPLIST_KEY_AIQuotaAppGroup: $(AIQUOTA_APP_GROUP)
+        INFOPLIST_KEY_AIQuotaKeychainSuffix: $(AIQUOTA_KEYCHAIN_SUFFIX)
+        GENERATE_INFOPLIST_FILE: true
+    info:
+      path: AIQuotaWidget/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+
+schemes:
+  AIQuotaApp:
+    build:
+      targets:
+        AIQuotaApp: all
+    run:
+      config: Debug
+    archive:
+      config: Release

@@ -1,0 +1,13 @@
+// AI Quota shared build configuration.
+// Keep secrets/certificates OUT of this file and use SigningConfig.xcconfig.
+
+AIQUOTA_APP_BUNDLE_ID = com.example.aiquota
+AIQUOTA_WIDGET_BUNDLE_ID = com.example.aiquota.widget
+AIQUOTA_APP_GROUP = group.com.example.aiquota.shared
+AIQUOTA_KEYCHAIN_SUFFIX = com.example.aiquota.shared
+
+// Optional signing overrides live in a git-ignored local file.
+#include? "SigningConfig.xcconfig"
+
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+SWIFT_VERSION = 5.9

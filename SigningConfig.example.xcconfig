@@ -1,0 +1,13 @@
+// Copy this file to SigningConfig.xcconfig, then edit it.
+// Never commit SigningConfig.xcconfig if it contains local signing choices.
+
+// Your Apple Developer Team ID (10 characters), e.g. ABCDE12345
+AIQUOTA_TEAM_ID =
+
+// Automatic: Xcode/Apple Developer account manages profiles.
+// Manual: specify profile specifiers below.
+AIQUOTA_CODE_SIGN_STYLE = Automatic
+
+// Usually leave these blank for Automatic signing.
+AIQUOTA_APP_PROFILE_SPECIFIER =
+AIQUOTA_WIDGET_PROFILE_SPECIFIER =
