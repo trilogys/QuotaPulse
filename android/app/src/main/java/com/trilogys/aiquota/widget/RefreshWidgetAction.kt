@@ -19,14 +19,10 @@ class RefreshWidgetAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val appWidgetId = (glanceId as? AppWidgetId)?.appWidgetId
         val request = OneTimeWorkRequestBuilder<QuotaRefreshWorker>()
-            .setInputData(workDataOf(QuotaRefreshWorker.KEY_APP_WIDGET_ID to (appWidgetId ?: -1)))
+            .setInputData(workDataOf(QuotaRefreshWorker.KEY_APP_WIDGET_ID to (appWidgetId ?: -1), QuotaRefreshWorker.KEY_MANUAL_REFRESH to true))
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            "aiquota-widget-refresh-${appWidgetId ?: "all"}",
-            ExistingWorkPolicy.REPLACE,
-            request
-        )
+        WorkManager.getInstance(context).enqueueUniqueWork("aiquota-widget-refresh-${appWidgetId ?: "all"}", ExistingWorkPolicy.REPLACE, request)
     }
 }
