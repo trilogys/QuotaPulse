@@ -6,13 +6,14 @@ struct AIQuotaEntry: TimelineEntry {
   let date: Date
   let items: [WidgetDisplayItem]
   let selectedAccountIDs: [UUID]
+  let cooldowns: [UUID: Date]
   let lastAttemptAt: Date
 }
 
 struct AIQuotaProvider: AppIntentTimelineProvider {
   func placeholder(in context: Context) -> AIQuotaEntry {
     let account = AccountRecord(provider: .codex, label: "Codex · Work")
-    return AIQuotaEntry(date: .now, items: [WidgetDisplayItem(account: account, snapshot: UsageSnapshot(accountID: account.id, provider: .codex, windows: [UsageWindow(id: "5h", label: "5h", remainingPercent: 72, resetAt: .now.addingTimeInterval(7200)), UsageWindow(id: "week", label: "周", remainingPercent: 48, resetAt: .now.addingTimeInterval(172800))]))], selectedAccountIDs: [account.id], lastAttemptAt: .now)
+    return AIQuotaEntry(date: .now, items: [WidgetDisplayItem(account: account, snapshot: UsageSnapshot(accountID: account.id, provider: .codex, windows: [UsageWindow(id: "5h", label: "5h", remainingPercent: 72, resetAt: .now.addingTimeInterval(7200)), UsageWindow(id: "week", label: "周", remainingPercent: 48, resetAt: .now.addingTimeInterval(172800))]))], selectedAccountIDs: [account.id], cooldowns: [:], lastAttemptAt: .now)
   }
 
   func snapshot(for configuration: AIQuotaWidgetConfigurationIntent, in context: Context) async -> AIQuotaEntry { await makeEntry(configuration: configuration, family: context.family) }
@@ -30,8 +31,12 @@ struct AIQuotaProvider: AppIntentTimelineProvider {
     let resolved: [AccountRecord]
     if suppliedAccounts != nil { resolved = accounts } else { resolved = await configuredAccounts(configuration, family: family) }
     var items: [WidgetDisplayItem] = []
-    for account in resolved { items.append(WidgetDisplayItem(account: account, snapshot: await SharedStore.shared.snapshot(for: account.id))) }
-    return AIQuotaEntry(date: .now, items: items, selectedAccountIDs: resolved.map(\.id), lastAttemptAt: .now)
+    var cooldowns: [UUID: Date] = [:]
+    for account in resolved {
+      items.append(WidgetDisplayItem(account: account, snapshot: await SharedStore.shared.snapshot(for: account.id)))
+      if let until = await SharedStore.shared.cooldownUntil(accountID: account.id) { cooldowns[account.id] = until }
+    }
+    return AIQuotaEntry(date: .now, items: items, selectedAccountIDs: resolved.map(\.id), cooldowns: cooldowns, lastAttemptAt: .now)
   }
 
   private func configuredAccountsSyncPlaceholder() -> [AccountRecord] { [] }
@@ -49,9 +54,7 @@ struct AIQuotaProvider: AppIntentTimelineProvider {
     return Array(filtered.prefix(itemLimit(for: family)))
   }
 
-  private func itemLimit(for family: WidgetFamily) -> Int {
-    switch family { case .systemSmall: 1; case .systemMedium: 3; case .systemLarge: 7; default: 3 }
-  }
+  private func itemLimit(for family: WidgetFamily) -> Int { switch family { case .systemSmall: 1; case .systemMedium: 3; case .systemLarge: 7; default: 3 } }
 }
 
 struct AIQuotaWidgetView: View {
@@ -59,29 +62,17 @@ struct AIQuotaWidgetView: View {
   let entry: AIQuotaEntry
 
   var body: some View {
-    VStack(spacing: family == .systemSmall ? 7 : 8) {
-      header
-      if entry.items.isEmpty { emptyState } else { ForEach(entry.items) { accountRow($0) } }
-    }
-    .padding(family == .systemSmall ? 12 : 14)
-    .containerBackground(for: .widget) { LinearGradient(colors: [Color.black.opacity(0.94), Color.black.opacity(0.82)], startPoint: .topLeading, endPoint: .bottomTrailing) }
-    .widgetURL(URL(string: "aiquota://accounts"))
+    VStack(spacing: family == .systemSmall ? 7 : 8) { header; if entry.items.isEmpty { emptyState } else { ForEach(entry.items) { accountRow($0) } } }
+      .padding(family == .systemSmall ? 12 : 14)
+      .containerBackground(for: .widget) { LinearGradient(colors: [Color.black.opacity(0.94), Color.black.opacity(0.82)], startPoint: .topLeading, endPoint: .bottomTrailing) }
+      .widgetURL(URL(string: "aiquota://accounts"))
   }
 
   private var header: some View {
-    HStack(spacing: 8) {
-      VStack(alignment: .leading, spacing: 1) {
-        Text("AI 额度").font(.system(size: family == .systemSmall ? 14 : 15, weight: .bold))
-        if family != .systemSmall { Text("点 ↻ 原地刷新，不打开 App").font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary) }
-      }
-      Spacer(minLength: 4)
-      Button(intent: RefreshWidgetSelectionIntent(accountIDs: entry.selectedAccountIDs)) { Image(systemName: "arrow.clockwise").font(.system(size: 13, weight: .bold)).frame(width: 28, height: 28).background(.thinMaterial, in: Circle()) }.buttonStyle(.plain).accessibilityLabel("刷新当前小组件")
-    }
+    HStack(spacing: 8) { VStack(alignment: .leading, spacing: 1) { Text("AI 额度").font(.system(size: family == .systemSmall ? 14 : 15, weight: .bold)); if family != .systemSmall { Text("点 ↻ 原地刷新，不打开 App").font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary) } }; Spacer(minLength: 4); Button(intent: RefreshWidgetSelectionIntent(accountIDs: entry.selectedAccountIDs)) { Image(systemName: "arrow.clockwise").font(.system(size: 13, weight: .bold)).frame(width: 28, height: 28).background(.thinMaterial, in: Circle()) }.buttonStyle(.plain).accessibilityLabel("刷新当前小组件") }
   }
 
-  private var emptyState: some View {
-    VStack(spacing: 6) { Image(systemName: "person.crop.circle.badge.plus").font(.title3); Text("还没有账号").font(.caption).fontWeight(.semibold); Text("点小组件进入设置").font(.caption2).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, maxHeight: .infinity)
-  }
+  private var emptyState: some View { VStack(spacing: 6) { Image(systemName: "person.crop.circle.badge.plus").font(.title3); Text("还没有账号").font(.caption).fontWeight(.semibold); Text("点小组件进入设置").font(.caption2).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, maxHeight: .infinity) }
 
   @ViewBuilder private func accountRow(_ item: WidgetDisplayItem) -> some View {
     HStack(spacing: 8) {
@@ -89,55 +80,40 @@ struct AIQuotaWidgetView: View {
         HStack(spacing: 5) {
           Text(item.account.label).font(.system(size: 11, weight: .semibold)).lineLimit(1)
           if let snapshot = item.snapshot, let kind = snapshot.effectiveErrorKind {
-            Text(snapshot.stale && hasCachedData(snapshot) ? "缓存 · \(kind.shortLabel)" : kind.shortLabel)
-              .font(.system(size: 8, weight: .bold))
-              .foregroundStyle(statusColor(kind))
-              .lineLimit(1)
+            Text(statusText(snapshot: snapshot, kind: kind, accountID: item.account.id)).font(.system(size: 8, weight: .bold)).foregroundStyle(statusColor(kind)).lineLimit(1)
           }
         }
-        if let snapshot = item.snapshot { snapshotBody(snapshot).invalidatableContent(true) }
-        else { Text("等待首次刷新").font(.system(size: 9)).foregroundStyle(.secondary) }
+        if let snapshot = item.snapshot { snapshotBody(snapshot).invalidatableContent(true) } else { Text("等待首次刷新").font(.system(size: 9)).foregroundStyle(.secondary) }
       }
       Spacer(minLength: 2)
       if family != .systemSmall { Button(intent: RefreshAccountIntent(accountID: item.account.id.uuidString)) { Image(systemName: "arrow.clockwise").font(.system(size: 10, weight: .semibold)).frame(width: 24, height: 24).background(Color.secondary.opacity(0.14), in: Circle()) }.buttonStyle(.plain).accessibilityLabel("刷新 \(item.account.label)") }
     }
   }
 
+  private func statusText(snapshot: UsageSnapshot, kind: ProviderErrorKind, accountID: UUID) -> String {
+    let base = snapshot.stale && hasCachedData(snapshot) ? "缓存 · \(kind.shortLabel)" : kind.shortLabel
+    guard let until = entry.cooldowns[accountID], until > entry.date else { return base }
+    return "\(base) · \(cooldownCountdown(until, from: entry.date)) 后重试"
+  }
+
   @ViewBuilder private func snapshotBody(_ snapshot: UsageSnapshot) -> some View {
-    if let balance = snapshot.balance {
-      HStack(spacing: 6) { Text("余额").foregroundStyle(.secondary); Text("\(balance.symbol)\(balance.total, specifier: "%.2f")").fontWeight(.bold); if !balance.available { Text("不可用").foregroundStyle(.red) } }.font(.system(size: 10))
-    } else if !snapshot.windows.isEmpty {
-      HStack(spacing: family == .systemSmall ? 5 : 8) { ForEach(Array(snapshot.windows.prefix(family == .systemSmall ? 2 : 3))) { quotaPill($0) } }
-    } else if !snapshot.metrics.isEmpty {
-      HStack(spacing: 8) { ForEach(Array(snapshot.metrics.prefix(2))) { Text("\($0.label) \($0.value)").font(.system(size: 9, weight: .medium)) } }
-    } else if let kind = snapshot.effectiveErrorKind {
-      HStack(spacing: 4) { Image(systemName: statusIcon(kind)); Text(kind.shortLabel) }.font(.system(size: 9, weight: .semibold)).foregroundStyle(statusColor(kind))
-    } else if let error = snapshot.errorMessage { Text(error).font(.system(size: 8)).foregroundStyle(.red).lineLimit(1) }
+    if let balance = snapshot.balance { HStack(spacing: 6) { Text("余额").foregroundStyle(.secondary); Text("\(balance.symbol)\(balance.total, specifier: "%.2f")").fontWeight(.bold); if !balance.available { Text("不可用").foregroundStyle(.red) } }.font(.system(size: 10)) }
+    else if !snapshot.windows.isEmpty { HStack(spacing: family == .systemSmall ? 5 : 8) { ForEach(Array(snapshot.windows.prefix(family == .systemSmall ? 2 : 3))) { quotaPill($0) } } }
+    else if !snapshot.metrics.isEmpty { HStack(spacing: 8) { ForEach(Array(snapshot.metrics.prefix(2))) { Text("\($0.label) \($0.value)").font(.system(size: 9, weight: .medium)) } } }
+    else if let kind = snapshot.effectiveErrorKind { HStack(spacing: 4) { Image(systemName: statusIcon(kind)); Text(kind.shortLabel) }.font(.system(size: 9, weight: .semibold)).foregroundStyle(statusColor(kind)) }
+    else if let error = snapshot.errorMessage { Text(error).font(.system(size: 8)).foregroundStyle(.red).lineLimit(1) }
   }
 
   private func hasCachedData(_ snapshot: UsageSnapshot) -> Bool { !snapshot.windows.isEmpty || !snapshot.metrics.isEmpty || snapshot.balance != nil }
-
-  private func statusColor(_ kind: ProviderErrorKind) -> Color {
-    switch kind { case .authentication, .configuration: .red; case .rateLimited, .providerUnavailable, .network: .orange; case .invalidResponse, .unknown: .yellow }
-  }
-
-  private func statusIcon(_ kind: ProviderErrorKind) -> String {
-    switch kind { case .authentication: "person.crop.circle.badge.exclamationmark"; case .rateLimited: "hourglass"; case .providerUnavailable: "exclamationmark.icloud"; case .network: "wifi.exclamationmark"; case .invalidResponse: "exclamationmark.triangle"; case .configuration: "gear.badge.xmark"; case .unknown: "exclamationmark.circle" }
-  }
+  private func statusColor(_ kind: ProviderErrorKind) -> Color { switch kind { case .authentication, .configuration: .red; case .rateLimited, .providerUnavailable, .network: .orange; case .invalidResponse, .unknown: .yellow } }
+  private func statusIcon(_ kind: ProviderErrorKind) -> String { switch kind { case .authentication: "person.crop.circle.badge.exclamationmark"; case .rateLimited: "hourglass"; case .providerUnavailable: "exclamationmark.icloud"; case .network: "wifi.exclamationmark"; case .invalidResponse: "exclamationmark.triangle"; case .configuration: "gear.badge.xmark"; case .unknown: "exclamationmark.circle" } }
 
   private func quotaPill(_ window: UsageWindow) -> some View {
-    VStack(alignment: .leading, spacing: 2) {
-      HStack(spacing: 2) { Text(window.label).foregroundStyle(.secondary); Text("\(Int(window.remainingPercent.rounded()))%").fontWeight(.bold) }.font(.system(size: 9))
-      GeometryReader { proxy in ZStack(alignment: .leading) { Capsule().fill(Color.secondary.opacity(0.18)); Capsule().fill(progressColor(window.remainingPercent)).frame(width: max(2, proxy.size.width * window.remainingPercent / 100)) } }.frame(height: 3)
-      if family != .systemSmall, let reset = window.resetAt, reset > entry.date { Text("↻ \(resetCountdown(reset, from: entry.date))").font(.system(size: 7, weight: .medium)).foregroundStyle(.secondary).lineLimit(1) }
-    }.frame(maxWidth: 78)
+    VStack(alignment: .leading, spacing: 2) { HStack(spacing: 2) { Text(window.label).foregroundStyle(.secondary); Text("\(Int(window.remainingPercent.rounded()))%").fontWeight(.bold) }.font(.system(size: 9)); GeometryReader { proxy in ZStack(alignment: .leading) { Capsule().fill(Color.secondary.opacity(0.18)); Capsule().fill(progressColor(window.remainingPercent)).frame(width: max(2, proxy.size.width * window.remainingPercent / 100)) } }.frame(height: 3); if family != .systemSmall, let reset = window.resetAt, reset > entry.date { Text("↻ \(resetCountdown(reset, from: entry.date))").font(.system(size: 7, weight: .medium)).foregroundStyle(.secondary).lineLimit(1) } }.frame(maxWidth: 78)
   }
 
-  private func resetCountdown(_ date: Date, from now: Date) -> String {
-    let seconds = max(0, Int(date.timeIntervalSince(now))); let days = seconds / 86400; let hours = (seconds % 86400) / 3600; let minutes = (seconds % 3600) / 60
-    if days > 0 { return "\(days)d \(hours)h" }; if hours > 0 { return "\(hours)h \(minutes)m" }; return "\(max(1, minutes))m"
-  }
-
+  private func cooldownCountdown(_ date: Date, from now: Date) -> String { resetCountdown(date, from: now) }
+  private func resetCountdown(_ date: Date, from now: Date) -> String { let seconds=max(0,Int(date.timeIntervalSince(now)));let days=seconds/86400;let hours=(seconds%86400)/3600;let minutes=(seconds%3600)/60;if days>0{return "\(days)d \(hours)h"};if hours>0{return "\(hours)h \(minutes)m"};return "\(max(1,minutes))m" }
   private func progressColor(_ remaining: Double) -> Color { if remaining <= 15 { return .red }; if remaining <= 35 { return .orange }; return .green }
 }
 
