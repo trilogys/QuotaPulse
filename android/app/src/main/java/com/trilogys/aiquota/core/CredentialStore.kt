@@ -28,6 +28,7 @@ class CredentialStore(context: Context) {
             .put("accountId", credential.accountId)
             .put("clientId", credential.clientId)
             .put("idToken", credential.idToken)
+            .put("baseUrl", credential.baseUrl)
             .put("deviceHeaders", headers)
         prefs.edit().putString(accountId, json.toString()).apply()
     }
@@ -52,7 +53,8 @@ class CredentialStore(context: Context) {
             accountId = json.optString("accountId").takeIf { it.isNotBlank() && it != "null" },
             clientId = json.optString("clientId").takeIf { it.isNotBlank() && it != "null" },
             idToken = json.optString("idToken").takeIf { it.isNotBlank() && it != "null" },
-            deviceHeaders = headers
+            deviceHeaders = headers,
+            baseUrl = json.optString("baseUrl").takeIf { it.isNotBlank() && it != "null" }
         )
     }
 
