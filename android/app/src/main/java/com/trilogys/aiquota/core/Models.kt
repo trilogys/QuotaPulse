@@ -17,7 +17,9 @@ data class Credential(
     val refreshToken: String? = null,
     val expiresAtEpochSeconds: Long? = null,
     val accountId: String? = null,
-    val clientId: String? = null
+    val clientId: String? = null,
+    val idToken: String? = null,
+    val deviceHeaders: Map<String, String>? = null
 )
 
 data class UsageWindow(
