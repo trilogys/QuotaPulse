@@ -59,7 +59,7 @@ mkdir -p "$DERIVED" "$OUT_DIR"
 
 xcodebuild \
   -project AIQuota.xcodeproj \
-  -scheme AIQuotaApp \
+  -scheme AIQuotaNativeWidget \
   -configuration Release \
   -sdk iphoneos \
   -destination 'generic/platform=iOS' \
