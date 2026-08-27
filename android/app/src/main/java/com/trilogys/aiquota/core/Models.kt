@@ -4,6 +4,27 @@ import java.util.UUID
 
 enum class ProviderId { CODEX, CLAUDE, KIMI, DEEPSEEK }
 
+enum class ProviderErrorKind {
+    AUTHENTICATION,
+    RATE_LIMITED,
+    PROVIDER_UNAVAILABLE,
+    NETWORK,
+    INVALID_RESPONSE,
+    CONFIGURATION,
+    UNKNOWN;
+
+    val label: String
+        get() = when (this) {
+            AUTHENTICATION -> "登录失效"
+            RATE_LIMITED -> "限流"
+            PROVIDER_UNAVAILABLE -> "服务异常"
+            NETWORK -> "网络异常"
+            INVALID_RESPONSE -> "数据异常"
+            CONFIGURATION -> "配置异常"
+            UNKNOWN -> "刷新失败"
+        }
+}
+
 data class AccountRecord(
     val id: String = UUID.randomUUID().toString(),
     val provider: ProviderId,
@@ -45,5 +66,21 @@ data class UsageSnapshot(
     val balance: BalanceSnapshot? = null,
     val updatedAtEpochSeconds: Long = System.currentTimeMillis() / 1000,
     val stale: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val errorKind: ProviderErrorKind? = null
 )
+
+object ProviderErrorClassifier {
+    fun classify(message: String?): ProviderErrorKind {
+        val raw = message.orEmpty().lowercase()
+        return when {
+            raw.contains("401") || raw.contains("403") || raw.contains("authentication expired") || raw.contains("missing credential") -> ProviderErrorKind.AUTHENTICATION
+            raw.contains("429") || raw.contains("rate limit") -> ProviderErrorKind.RATE_LIMITED
+            raw.contains("500") || raw.contains("502") || raw.contains("503") || raw.contains("504") || raw.contains("temporarily unavailable") -> ProviderErrorKind.PROVIDER_UNAVAILABLE
+            raw.contains("network") || raw.contains("connection") || raw.contains("timeout") || raw.contains("dns") -> ProviderErrorKind.NETWORK
+            raw.contains("response format") || raw.contains("json") || raw.contains("parse") || raw.contains("unexpected") -> ProviderErrorKind.INVALID_RESPONSE
+            raw.contains("configuration") || raw.contains("base url") -> ProviderErrorKind.CONFIGURATION
+            else -> ProviderErrorKind.UNKNOWN
+        }
+    }
+}
