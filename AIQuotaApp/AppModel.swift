@@ -81,6 +81,7 @@ final class AppModel: ObservableObject {
     await SharedStore.shared.removeAccount(account.id)
     accounts.removeAll { $0.id == account.id }
     snapshots[account.id] = nil
+    await normalizeAndSaveOrder()
     WidgetCenter.shared.reloadAllTimelines()
   }
 
@@ -99,6 +100,31 @@ final class AppModel: ObservableObject {
     await SharedStore.shared.upsertAccount(updated)
     if let index = accounts.firstIndex(where: { $0.id == account.id }) { accounts[index] = updated }
     WidgetCenter.shared.reloadAllTimelines()
+  }
+
+  func move(_ account: AccountRecord, offset: Int) async {
+    guard offset != 0, let from = accounts.firstIndex(where: { $0.id == account.id }) else { return }
+    let to = min(max(0, from + offset), accounts.count - 1)
+    guard to != from else { return }
+    var reordered = accounts
+    let item = reordered.remove(at: from)
+    reordered.insert(item, at: to)
+    accounts = reordered.enumerated().map { index, record in
+      var updated = record
+      updated.sortOrder = index
+      return updated
+    }
+    await SharedStore.shared.saveAccounts(accounts)
+    WidgetCenter.shared.reloadAllTimelines()
+  }
+
+  private func normalizeAndSaveOrder() async {
+    accounts = accounts.enumerated().map { index, record in
+      var updated = record
+      updated.sortOrder = index
+      return updated
+    }
+    await SharedStore.shared.saveAccounts(accounts)
   }
 
   private func saveCredential(_ credential: Credential, provider: ProviderID) async throws {
