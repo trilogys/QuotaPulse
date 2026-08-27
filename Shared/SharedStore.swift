@@ -68,10 +68,11 @@ actor SharedStore {
     defaults.set(data, forKey: Key.snapshot(snapshot.accountID))
   }
 
-  func markSnapshotStale(accountID: UUID, message: String) {
+  func markSnapshotStale(accountID: UUID, message: String, kind: ProviderErrorKind? = nil) {
     guard var cached = snapshot(for: accountID) else { return }
     cached.stale = true
     cached.errorMessage = message
+    cached.errorKind = kind
     saveSnapshot(cached)
   }
 
