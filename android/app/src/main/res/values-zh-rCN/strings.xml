@@ -8,6 +8,7 @@
     <string name="hide">隐藏</string>
     <string name="show">显示</string>
     <string name="delete">删除</string>
+    <string name="save">保存</string>
     <string name="reauthenticate">重新认证</string>
     <string name="recommended">推荐</string>
     <string name="hidden">已隐藏</string>
@@ -25,6 +26,16 @@
     <string name="widget_title">AI 额度</string>
     <string name="widget_cached">缓存</string>
     <string name="reset_in">重置 %1$s</string>
+    <string name="widget_config_title">配置 AIQuota 小组件</string>
+    <string name="widget_config_subtitle">每个小组件都可以独立选择内容、布局和显示条数；尺寸较小时会自动使用紧凑布局。</string>
+    <string name="widget_content">显示内容</string>
+    <string name="widget_all_accounts">全部账号</string>
+    <string name="widget_provider_only">只显示 %1$s</string>
+    <string name="widget_single_account">单账号</string>
+    <string name="widget_layout">布局</string>
+    <string name="widget_compact">紧凑</string>
+    <string name="widget_detailed">详细</string>
+    <string name="widget_rows">显示条数</string>
     <string name="oauth_fallback">高级/兜底：也可以直接导入已有凭据</string>
     <string name="access_token">Access Token</string>
     <string name="api_key">API Key</string>
