@@ -69,6 +69,28 @@ final class AppModel: ObservableObject {
     }
   }
 
+  func reauthenticate(_ account: AccountRecord, presenter: UIViewController) async {
+    await performBusy {
+      let credential: Credential
+      switch account.provider {
+      case .codex:
+        let coordinator = CodexOAuthCoordinator()
+        credential = try await coordinator.login(presenting: presenter)
+      case .claude:
+        let coordinator = ClaudeOAuthCoordinator()
+        credential = try await coordinator.login(presenting: presenter)
+      case .kimi:
+        let coordinator = KimiOAuthCoordinator()
+        credential = try await coordinator.login(presenting: presenter)
+      default:
+        throw NSError(domain: "AIQuota", code: 1, userInfo: [NSLocalizedDescriptionKey: "该平台请重新输入 API Key/Token"])
+      }
+      try keychain.saveCredential(credential, accountID: account.id)
+      if let snapshot = try? await UsageService.shared.refresh(accountID: account.id) { snapshots[account.id] = snapshot }
+      WidgetCenter.shared.reloadAllTimelines()
+    }
+  }
+
   func addAPIKey(provider: ProviderID, key: String, baseURL: String? = nil) async {
     await performBusy {
       let credential = Credential(accessToken: key, baseURL: baseURL?.trimmingCharacters(in: .whitespacesAndNewlines))
