@@ -24,8 +24,8 @@ android {
         applicationId = "com.trilogys.aiquota"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1000
-        versionName = "0.10.0"
+        versionCode = 1100
+        versionName = "0.11.0"
     }
 
     if (hasReleaseSigning) {
@@ -72,4 +72,6 @@ dependencies {
     implementation("androidx.glance:glance-appwidget:1.2.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+
+    testImplementation("junit:junit:4.13.2")
 }
