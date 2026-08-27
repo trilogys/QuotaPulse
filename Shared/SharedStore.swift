@@ -16,25 +16,16 @@ actor SharedStore {
 
   init() {
     defaults = UserDefaults(suiteName: AppConfig.appGroup) ?? .standard
-    encoder = JSONEncoder()
-    encoder.dateEncodingStrategy = .iso8601
-    decoder = JSONDecoder()
-    decoder.dateDecodingStrategy = .iso8601
+    encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+    decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
   }
 
   func accounts() -> [AccountRecord] {
-    guard let data = defaults.data(forKey: Key.accounts),
-      let value = try? decoder.decode([AccountRecord].self, from: data)
-    else { return [] }
-    return value.sorted { lhs, rhs in
-      if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
-      return lhs.createdAt < rhs.createdAt
-    }
+    guard let data = defaults.data(forKey: Key.accounts), let value = try? decoder.decode([AccountRecord].self, from: data) else { return [] }
+    return value.sorted { lhs, rhs in lhs.sortOrder != rhs.sortOrder ? lhs.sortOrder < rhs.sortOrder : lhs.createdAt < rhs.createdAt }
   }
 
-  func account(id: UUID) -> AccountRecord? {
-    accounts().first { $0.id == id }
-  }
+  func account(id: UUID) -> AccountRecord? { accounts().first { $0.id == id } }
 
   func saveAccounts(_ accounts: [AccountRecord]) {
     guard let data = try? encoder.encode(accounts) else { return }
@@ -43,19 +34,14 @@ actor SharedStore {
 
   func upsertAccount(_ account: AccountRecord) {
     var list = accounts()
-    if let idx = list.firstIndex(where: { $0.id == account.id }) {
-      list[idx] = account
-    } else {
-      list.append(account)
-    }
+    if let idx = list.firstIndex(where: { $0.id == account.id }) { list[idx] = account } else { list.append(account) }
     saveAccounts(list)
   }
 
   func removeAccount(_ id: UUID) {
     saveAccounts(accounts().filter { $0.id != id })
     defaults.removeObject(forKey: Key.snapshot(id))
-    let visible = visibleAccountIDs().filter { $0 != id }
-    setVisibleAccountIDs(visible)
+    setVisibleAccountIDs(visibleAccountIDs().filter { $0 != id })
   }
 
   func snapshot(for id: UUID) -> UsageSnapshot? {
@@ -64,15 +50,22 @@ actor SharedStore {
   }
 
   func saveSnapshot(_ snapshot: UsageSnapshot) {
-    guard let data = try? encoder.encode(snapshot) else { return }
-    defaults.set(data, forKey: Key.snapshot(snapshot.accountID))
+    var normalized = snapshot
+    if normalized.errorMessage == nil {
+      normalized.errorKind = nil
+      normalized.stale = false
+    } else if normalized.errorKind == nil {
+      normalized.errorKind = ProviderErrorClassifier.classify(message: normalized.errorMessage)
+    }
+    guard let data = try? encoder.encode(normalized) else { return }
+    defaults.set(data, forKey: Key.snapshot(normalized.accountID))
   }
 
   func markSnapshotStale(accountID: UUID, message: String, kind: ProviderErrorKind? = nil) {
     guard var cached = snapshot(for: accountID) else { return }
     cached.stale = true
     cached.errorMessage = message
-    cached.errorKind = kind
+    cached.errorKind = kind ?? ProviderErrorClassifier.classify(message: message)
     saveSnapshot(cached)
   }
 
@@ -81,28 +74,21 @@ actor SharedStore {
     return [10, 15, 30, 60, 120].contains(value) ? value : 15
   }
 
-  func setAutoRefreshMinutes(_ minutes: Int) {
-    defaults.set(minutes, forKey: Key.autoRefreshMinutes)
-  }
+  func setAutoRefreshMinutes(_ minutes: Int) { defaults.set(minutes, forKey: Key.autoRefreshMinutes) }
 
   func visibleAccountIDs() -> [UUID] {
-    guard let strings = defaults.array(forKey: Key.visibleAccountIDs) as? [String] else {
-      return []
-    }
+    guard let strings = defaults.array(forKey: Key.visibleAccountIDs) as? [String] else { return [] }
     return strings.compactMap(UUID.init(uuidString:))
   }
 
-  func setVisibleAccountIDs(_ ids: [UUID]) {
-    defaults.set(ids.map(\.uuidString), forKey: Key.visibleAccountIDs)
-  }
+  func setVisibleAccountIDs(_ ids: [UUID]) { defaults.set(ids.map(\.uuidString), forKey: Key.visibleAccountIDs) }
 
   func displayAccounts(limit: Int? = nil) -> [AccountRecord] {
     let enabled = accounts().filter(\.isEnabled)
     let selected = visibleAccountIDs()
     let result: [AccountRecord]
-    if selected.isEmpty {
-      result = enabled
-    } else {
+    if selected.isEmpty { result = enabled }
+    else {
       let map = Dictionary(uniqueKeysWithValues: enabled.map { ($0.id, $0) })
       result = selected.compactMap { map[$0] }
     }
