@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,6 +31,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.glance.appwidget.updateAll
 import com.trilogys.aiquota.auth.OAuthManager
@@ -75,6 +78,7 @@ private fun AIQuotaScreen(
     updateWidget: suspend () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var accounts by remember { mutableStateOf(accountStore.accounts()) }
     var selectedProvider by remember { mutableStateOf(ProviderId.CODEX) }
     var name by remember { mutableStateOf("") }
@@ -94,7 +98,7 @@ private fun AIQuotaScreen(
                 credentialStore.save(existing.id, credential)
                 reauthAccountId = null
                 name = ""
-                status = "${existing.name} 重新认证成功"
+                status = context.getString(R.string.reauth_success, existing.name)
                 scope.launch {
                     withContext(Dispatchers.IO) {
                         runCatching { usageService.refresh(existing) }
@@ -116,17 +120,14 @@ private fun AIQuotaScreen(
     }
 
     fun beginReauth(account: AccountRecord) {
-        if (account.provider == ProviderId.DEEPSEEK) {
-            selectedProvider = ProviderId.DEEPSEEK
-            reauthAccountId = account.id
-            name = account.name
-            status = "请重新输入 ${account.name} 的 API Key"
+        selectedProvider = account.provider
+        reauthAccountId = account.id
+        name = account.name
+        oauthPaste = ""
+        status = if (account.provider == ProviderId.DEEPSEEK) {
+            context.getString(R.string.reauth_api_key, account.name)
         } else {
-            selectedProvider = account.provider
-            reauthAccountId = account.id
-            name = account.name
-            oauthPaste = ""
-            status = "正在重新认证 ${account.name}；完成后会覆盖原凭据，不会新增账号。"
+            context.getString(R.string.reauth_in_progress, account.name)
         }
     }
 
@@ -138,8 +139,8 @@ private fun AIQuotaScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
-                Text("AIQuota", style = MaterialTheme.typography.headlineMedium)
-                Text("原生 Android · 多账号 · OAuth · 桌面小组件")
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(R.string.app_subtitle))
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     ProviderId.entries.forEach { provider ->
@@ -149,75 +150,96 @@ private fun AIQuotaScreen(
                     }
                 }
                 if (reauthAccountId != null) {
-                    Text("重新认证模式：成功后覆盖原账号凭据")
-                    TextButton(onClick = { reauthAccountId = null; name = ""; oauthPaste = ""; status = "已取消重新认证" }) { Text("取消重新认证") }
+                    Text(stringResource(R.string.reauth_mode))
+                    TextButton(onClick = {
+                        reauthAccountId = null; name = ""; oauthPaste = ""; status = context.getString(R.string.reauth_cancelled)
+                    }) { Text(stringResource(R.string.cancel_reauth)) }
                 }
-                OutlinedTextField(name, { name = it }, label = { Text("账号名称（可选）") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.account_name_optional)) }, modifier = Modifier.fillMaxWidth())
 
                 when (selectedProvider) {
                     ProviderId.CODEX -> {
                         Button(onClick = {
-                            status = "请在浏览器登录 Codex；完成后会自动回到本机 localhost。"
+                            status = context.getString(R.string.codex_open_browser)
                             scope.launch {
                                 runCatching { oauth.loginCodex() }
-                                    .onSuccess { saveCredential(ProviderId.CODEX, it); if (reauthAccountId == null) status = "Codex OAuth 完成" }
-                                    .onFailure { status = "自动回调未完成：${it.message}\n可复制 localhost 完整地址到下方手动完成。" }
+                                    .onSuccess { saveCredential(ProviderId.CODEX, it) }
+                                    .onFailure { status = context.getString(R.string.codex_manual_fallback, it.message ?: "OAuth failed") }
                             }
-                        }) { Text(if (reauthAccountId != null) "重新登录 Codex" else "Codex OAuth 登录") }
-                        OutlinedTextField(oauthPaste, { oauthPaste = it }, label = { Text("localhost callback URL（自动回调失败时）") }, modifier = Modifier.fillMaxWidth())
+                        }) { Text(stringResource(if (reauthAccountId != null) R.string.codex_relogin else R.string.codex_login)) }
+                        OutlinedTextField(
+                            oauthPaste,
+                            { oauthPaste = it },
+                            label = { Text(stringResource(R.string.codex_callback_hint)) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                         Button(enabled = oauthPaste.isNotBlank(), onClick = {
                             scope.launch {
                                 runCatching { oauth.completeCodexManual(oauthPaste) }
                                     .onSuccess { saveCredential(ProviderId.CODEX, it); oauthPaste = "" }
                                     .onFailure { status = it.message ?: "Codex callback failed" }
                             }
-                        }) { Text("完成 Codex 回调") }
+                        }) { Text(stringResource(R.string.codex_callback)) }
                     }
                     ProviderId.CLAUDE -> {
                         Button(onClick = {
                             oauth.beginClaude()
-                            status = "Claude 授权完成后，把页面显示的 CODE#STATE 粘贴到下方。"
-                        }) { Text(if (reauthAccountId != null) "重新登录 Claude" else "Claude OAuth 登录") }
-                        OutlinedTextField(oauthPaste, { oauthPaste = it }, label = { Text("Claude CODE#STATE") }, modifier = Modifier.fillMaxWidth())
+                            status = context.getString(R.string.claude_paste_code)
+                        }) { Text(stringResource(if (reauthAccountId != null) R.string.claude_relogin else R.string.claude_login)) }
+                        OutlinedTextField(
+                            oauthPaste,
+                            { oauthPaste = it },
+                            label = { Text(stringResource(R.string.claude_code_hint)) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                         Button(enabled = oauthPaste.isNotBlank(), onClick = {
                             scope.launch {
                                 runCatching { oauth.completeClaude(oauthPaste) }
                                     .onSuccess { saveCredential(ProviderId.CLAUDE, it); oauthPaste = "" }
                                     .onFailure { status = it.message ?: "Claude OAuth failed" }
                             }
-                        }) { Text("完成 Claude 授权") }
+                        }) { Text(stringResource(R.string.claude_complete)) }
                     }
                     ProviderId.KIMI -> {
                         Button(onClick = {
-                            status = "正在启动 Kimi Device OAuth…"
+                            status = context.getString(R.string.kimi_starting)
                             scope.launch {
                                 runCatching { oauth.loginKimi() }
                                     .onSuccess { saveCredential(ProviderId.KIMI, it) }
                                     .onFailure { status = it.message ?: "Kimi OAuth failed" }
                             }
-                        }) { Text(if (reauthAccountId != null) "重新登录 Kimi" else "Kimi Device OAuth 登录") }
+                        }) { Text(stringResource(if (reauthAccountId != null) R.string.kimi_relogin else R.string.kimi_login)) }
                     }
                     ProviderId.DEEPSEEK -> Unit
                 }
 
-                Text("高级/兜底：也可以直接导入已有凭据")
-                OutlinedTextField(accessToken, { accessToken = it }, label = { Text(if (selectedProvider == ProviderId.DEEPSEEK) "API Key" else "Access Token") }, modifier = Modifier.fillMaxWidth())
+                Text(stringResource(R.string.oauth_fallback))
+                OutlinedTextField(
+                    accessToken,
+                    { accessToken = it },
+                    label = { Text(stringResource(if (selectedProvider == ProviderId.DEEPSEEK) R.string.api_key else R.string.access_token)) },
+                    modifier = Modifier.fillMaxWidth()
+                )
                 if (selectedProvider != ProviderId.DEEPSEEK) {
-                    OutlinedTextField(refreshToken, { refreshToken = it }, label = { Text("Refresh Token（推荐）") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(refreshToken, { refreshToken = it }, label = { Text(stringResource(R.string.refresh_token)) }, modifier = Modifier.fillMaxWidth())
                 }
                 if (selectedProvider == ProviderId.CODEX) {
-                    OutlinedTextField(accountId, { accountId = it }, label = { Text("ChatGPT Account ID（可选）") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(accountId, { accountId = it }, label = { Text(stringResource(R.string.account_id_optional)) }, modifier = Modifier.fillMaxWidth())
                 }
                 Button(enabled = accessToken.isNotBlank(), onClick = {
-                    saveCredential(selectedProvider, Credential(accessToken = accessToken.trim(), refreshToken = refreshToken.trim().ifBlank { null }, accountId = accountId.trim().ifBlank { null }))
+                    saveCredential(selectedProvider, Credential(
+                        accessToken = accessToken.trim(),
+                        refreshToken = refreshToken.trim().ifBlank { null },
+                        accountId = accountId.trim().ifBlank { null }
+                    ))
                     accessToken = ""; refreshToken = ""; accountId = ""
-                }) { Text(if (reauthAccountId != null) "更新凭据" else "导入凭据") }
+                }) { Text(stringResource(if (reauthAccountId != null) R.string.update_credentials else R.string.import_credentials)) }
 
                 if (status.isNotBlank()) Text(status)
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = {
                     scope.launch {
-                        status = "正在刷新…"
+                        status = context.getString(R.string.refreshing)
                         withContext(Dispatchers.IO) {
                             accountStore.accounts().filter { it.enabled }.forEach { account ->
                                 runCatching { usageService.refresh(account) }
@@ -225,44 +247,49 @@ private fun AIQuotaScreen(
                                     .onFailure { accountStore.markStale(account.id, it.message ?: "Refresh failed") }
                             }
                         }
-                        updateWidget(); status = "刷新完成"; reload()
+                        updateWidget(); status = context.getString(R.string.refresh_complete); reload()
                     }
-                }) { Text("刷新全部") }
+                }) { Text(stringResource(R.string.refresh_all)) }
             }
 
             items(accounts, key = { it.id }) { account ->
                 val snapshot = accountStore.snapshot(account.id)
-                val health = credentialHealth(account, credentialStore, snapshot?.stale == true)
+                val health = stringResource(credentialHealthRes(account, credentialStore, snapshot?.stale == true))
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp)) {
-                        val recommendedMark = if (recommended.contains(account.id)) " ★ 推荐" else ""
-                        val hiddenMark = if (!account.enabled) " · 已隐藏" else ""
+                        val recommendedMark = if (recommended.contains(account.id)) " ★ ${stringResource(R.string.recommended)}" else ""
+                        val hiddenMark = if (!account.enabled) " · ${stringResource(R.string.hidden)}" else ""
                         Text("${account.provider.name} · ${account.name}$recommendedMark$hiddenMark", style = MaterialTheme.typography.titleMedium)
-                        Text("凭据：$health")
+                        Text(stringResource(R.string.credential_status, health))
                         val summary = snapshot?.balance?.let { "${it.symbol}${"%.2f".format(it.total)}" }
                             ?: snapshot?.windows?.joinToString("  ") { window ->
                                 val reset = window.resetAtEpochSeconds?.let(::formatCountdown)
-                                if (reset == null) "${window.label} ${window.remainingPercent.roundToInt()}%" else "${window.label} ${window.remainingPercent.roundToInt()}% ↻$reset"
-                            } ?: "尚未刷新"
+                                if (reset == null) "${window.label} ${window.remainingPercent.roundToInt()}%"
+                                else "${window.label} ${window.remainingPercent.roundToInt()}% ↻$reset"
+                            } ?: stringResource(R.string.no_data)
                         Text(summary)
                         snapshot?.errorMessage?.let { Text("⚠ $it") }
                         Row {
                             TextButton(onClick = {
                                 scope.launch {
-                                    status = "刷新 ${account.name}…"
+                                    status = "${context.getString(R.string.refresh)} ${account.name}…"
                                     withContext(Dispatchers.IO) {
                                         runCatching { usageService.refresh(account) }
                                             .onSuccess(accountStore::saveSnapshot)
                                             .onFailure { accountStore.markStale(account.id, it.message ?: "Refresh failed") }
                                     }
-                                    updateWidget(); status = "完成"; reload()
+                                    updateWidget(); status = context.getString(R.string.refresh_complete); reload()
                                 }
-                            }) { Text("刷新") }
-                            TextButton(onClick = { beginReauth(account) }) { Text("重新认证") }
-                            TextButton(onClick = { accountStore.setEnabled(account.id, !account.enabled); reload(); scope.launch { updateWidget() } }) { Text(if (account.enabled) "隐藏" else "显示") }
+                            }) { Text(stringResource(R.string.refresh)) }
+                            TextButton(onClick = { beginReauth(account) }) { Text(stringResource(R.string.reauthenticate)) }
+                            TextButton(onClick = {
+                                accountStore.setEnabled(account.id, !account.enabled); reload(); scope.launch { updateWidget() }
+                            }) { Text(stringResource(if (account.enabled) R.string.hide else R.string.show)) }
                             TextButton(onClick = { accountStore.move(account.id, -1); reload(); scope.launch { updateWidget() } }) { Text("↑") }
                             TextButton(onClick = { accountStore.move(account.id, 1); reload(); scope.launch { updateWidget() } }) { Text("↓") }
-                            TextButton(onClick = { accountStore.delete(account.id); credentialStore.delete(account.id); reload(); scope.launch { updateWidget() } }) { Text("删除") }
+                            TextButton(onClick = {
+                                accountStore.delete(account.id); credentialStore.delete(account.id); reload(); scope.launch { updateWidget() }
+                            }) { Text(stringResource(R.string.delete)) }
                         }
                     }
                 }
@@ -271,16 +298,17 @@ private fun AIQuotaScreen(
     }
 }
 
-private fun credentialHealth(account: AccountRecord, store: CredentialStore, stale: Boolean): String {
-    val credential = store.get(account.id) ?: return "需重新认证"
-    if (account.provider == ProviderId.DEEPSEEK) return if (stale) "已保存 · 数据缓存" else "正常"
+@StringRes
+private fun credentialHealthRes(account: AccountRecord, store: CredentialStore, stale: Boolean): Int {
+    val credential = store.get(account.id) ?: return R.string.credential_sign_in_again
+    if (account.provider == ProviderId.DEEPSEEK) return if (stale) R.string.credential_cached else R.string.credential_healthy
     val expiry = credential.expiresAtEpochSeconds
     if (expiry != null) {
         val now = System.currentTimeMillis() / 1000
-        if (expiry <= now) return if (!credential.refreshToken.isNullOrBlank()) "已过期 · 可自动续期" else "需重新认证"
-        if (expiry - now < 3600) return "即将自动续期"
+        if (expiry <= now) return if (!credential.refreshToken.isNullOrBlank()) R.string.credential_refreshable else R.string.credential_sign_in_again
+        if (expiry - now < 3600) return R.string.credential_renew_soon
     }
-    return if (stale) "凭据存在 · 数据缓存" else "正常"
+    return if (stale) R.string.credential_cached else R.string.credential_healthy
 }
 
 private fun formatCountdown(epochSeconds: Long): String {
