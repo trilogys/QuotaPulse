@@ -5,6 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalContext
+import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.AppWidgetId
 import androidx.glance.appwidget.GlanceAppWidget
@@ -20,6 +22,7 @@ import androidx.glance.layout.padding
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import com.trilogys.aiquota.R
 import com.trilogys.aiquota.core.AccountRecord
 import com.trilogys.aiquota.core.AccountStore
 import com.trilogys.aiquota.core.UsageSnapshot
@@ -56,24 +59,38 @@ class AIQuotaWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 @Composable
-private fun WidgetContent(rows: List<Pair<AccountRecord, UsageSnapshot?>>, layout: WidgetConfigStore.Layout) {
-    Column(GlanceModifier.fillMaxSize().padding(12.dp)) {
+private fun WidgetContent(rows: List<Pair<AccountRecord, UsageSnapshot?>>, requestedLayout: WidgetConfigStore.Layout) {
+    val context = LocalContext.current
+    val size = LocalSize.current
+    val compactBySize = size.width < 180.dp || size.height < 140.dp
+    val layout = if (compactBySize) WidgetConfigStore.Layout.COMPACT else requestedLayout
+    val adaptiveRows = when {
+        size.height < 110.dp -> 1
+        size.height < 170.dp -> 2
+        size.height < 250.dp -> 4
+        else -> 8
+    }
+    val visibleRows = rows.take(adaptiveRows)
+
+    Column(GlanceModifier.fillMaxSize().padding(if (compactBySize) 9.dp else 12.dp)) {
         Row {
-            Text("AI QUOTA", style = TextStyle(fontWeight = FontWeight.Bold))
+            Text(context.getString(R.string.widget_title), style = TextStyle(fontWeight = FontWeight.Bold))
             Text("  ↻", modifier = GlanceModifier.clickable(actionRunCallback<RefreshWidgetAction>()))
         }
-        Spacer(GlanceModifier.height(6.dp))
-        if (rows.isEmpty()) {
-            Text("暂无匹配账号，长按小组件重新配置")
+        Spacer(GlanceModifier.height(if (compactBySize) 4.dp else 6.dp))
+        if (visibleRows.isEmpty()) {
+            Text(context.getString(R.string.widget_empty))
         } else {
-            rows.forEach { (account, snapshot) ->
+            visibleRows.forEach { (account, snapshot) ->
                 when (layout) {
                     WidgetConfigStore.Layout.COMPACT -> CompactAccountRow(account, snapshot)
-                    WidgetConfigStore.Layout.DETAILED -> DetailedAccountRow(account, snapshot)
+                    WidgetConfigStore.Layout.DETAILED -> DetailedAccountRow(context, account, snapshot)
                 }
                 Spacer(GlanceModifier.height(if (layout == WidgetConfigStore.Layout.DETAILED) 6.dp else 3.dp))
             }
-            rows.mapNotNull { it.second?.updatedAtEpochSeconds }.maxOrNull()?.let { Text("更新 ${formatTime(it)}") }
+            visibleRows.mapNotNull { it.second?.updatedAtEpochSeconds }.maxOrNull()?.let {
+                Text(context.getString(R.string.updated, formatTime(it)))
+            }
         }
     }
 }
@@ -87,20 +104,20 @@ private fun CompactAccountRow(account: AccountRecord, snapshot: UsageSnapshot?) 
 }
 
 @Composable
-private fun DetailedAccountRow(account: AccountRecord, snapshot: UsageSnapshot?) {
+private fun DetailedAccountRow(context: Context, account: AccountRecord, snapshot: UsageSnapshot?) {
     Column {
         Text("${account.provider.name} · ${account.name}", style = TextStyle(fontWeight = FontWeight.Medium))
         if (snapshot == null) {
-            Text("尚未刷新")
+            Text(context.getString(R.string.no_data))
         } else if (snapshot.stale) {
-            Text("⚠ 缓存 · ${summary(snapshot)}")
+            Text("⚠ ${context.getString(R.string.widget_cached)} · ${summary(snapshot)}")
         } else if (snapshot.balance != null) {
-            Text("余额 ${snapshot.balance.symbol}${"%.2f".format(snapshot.balance.total)}")
+            Text("${context.getString(R.string.balance)} ${snapshot.balance.symbol}${"%.2f".format(snapshot.balance.total)}")
         } else {
             Text(snapshot.windows.take(2).joinToString(" · ") {
                 val reset = it.resetAtEpochSeconds?.let(::formatCountdown)
                 if (reset == null) "${it.label} ${it.remainingPercent.roundToInt()}%"
-                else "${it.label} ${it.remainingPercent.roundToInt()}% ↻$reset"
+                else "${it.label} ${it.remainingPercent.roundToInt()}% · ${context.getString(R.string.reset_in, reset)}"
             })
         }
     }
