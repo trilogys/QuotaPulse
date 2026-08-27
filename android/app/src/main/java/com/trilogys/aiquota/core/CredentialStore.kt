@@ -19,24 +19,40 @@ class CredentialStore(context: Context) {
     )
 
     fun save(accountId: String, credential: Credential) {
+        val headers = JSONObject()
+        credential.deviceHeaders?.forEach { (key, value) -> headers.put(key, value) }
         val json = JSONObject()
             .put("accessToken", credential.accessToken)
             .put("refreshToken", credential.refreshToken)
             .put("expiresAt", credential.expiresAtEpochSeconds)
             .put("accountId", credential.accountId)
             .put("clientId", credential.clientId)
+            .put("idToken", credential.idToken)
+            .put("deviceHeaders", headers)
         prefs.edit().putString(accountId, json.toString()).apply()
     }
 
     fun get(accountId: String): Credential? {
         val raw = prefs.getString(accountId, null) ?: return null
         val json = JSONObject(raw)
+        val headersJson = json.optJSONObject("deviceHeaders")
+        val headers = headersJson?.let { obj ->
+            buildMap {
+                val keys = obj.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    obj.optString(key).takeIf { it.isNotBlank() }?.let { put(key, it) }
+                }
+            }
+        }?.takeIf { it.isNotEmpty() }
         return Credential(
             accessToken = json.getString("accessToken"),
             refreshToken = json.optString("refreshToken").takeIf { it.isNotBlank() && it != "null" },
             expiresAtEpochSeconds = json.optLong("expiresAt").takeIf { it > 0 },
             accountId = json.optString("accountId").takeIf { it.isNotBlank() && it != "null" },
-            clientId = json.optString("clientId").takeIf { it.isNotBlank() && it != "null" }
+            clientId = json.optString("clientId").takeIf { it.isNotBlank() && it != "null" },
+            idToken = json.optString("idToken").takeIf { it.isNotBlank() && it != "null" },
+            deviceHeaders = headers
         )
     }
 
