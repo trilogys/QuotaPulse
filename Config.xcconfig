@@ -1,10 +1,12 @@
 // AI Quota shared build configuration.
 // Keep secrets/certificates OUT of this file and use SigningConfig.xcconfig.
 
-AIQUOTA_APP_BUNDLE_ID = com.example.aiquota
-AIQUOTA_WIDGET_BUNDLE_ID = com.example.aiquota.widget
-AIQUOTA_APP_GROUP = group.com.example.aiquota.shared
-AIQUOTA_KEYCHAIN_SUFFIX = com.example.aiquota.shared
+// Single-profile compatibility default. This matches the currently supplied
+// main-app provisioning profile; no private certificate material is stored here.
+AIQUOTA_APP_BUNDLE_ID = app.apricot6065.celery3385
+AIQUOTA_WIDGET_BUNDLE_ID = app.apricot6065.celery3385.widget
+AIQUOTA_APP_GROUP = group.ff95e41e9447c47b.1
+AIQUOTA_KEYCHAIN_SUFFIX = app.apricot6065.celery3385
 
 // Optional signing overrides live in a git-ignored local file.
 #include? "SigningConfig.xcconfig"
