@@ -6,7 +6,7 @@ import org.json.JSONObject
 
 class AccountStore(context: Context) {
     private val prefs = context.getSharedPreferences("aiquota_state", Context.MODE_PRIVATE)
-    fun accounts(): List<AccountRecord> { val array = JSONArray(prefs.getString("accounts", "[]") ?: "[]"); return buildList { for (i in 0 until array.length()) { val o = array.optJSONObject(i) ?: continue; runCatching { add(AccountRecord(id=o.getString("id"), provider=ProviderId.valueOf(o.getString("provider")), name=o.optString("name",o.getString("provider")), enabled=o.optBoolean("enabled",true), order=o.optInt("order",i))) } } }.sortedWith(compareBy<AccountRecord>{it.order}.thenBy{it.name}) }
+    fun accounts(): List<AccountRecord> { val array = JSONArray(prefs.getString("accounts", "[]") ?: "[]"); return buildList { for (i in 0 until array.length()) { val o = array.optJSONObject(i) ?: continue; runCatching { add(AccountRecord(id=o.getString("id"), provider=ProviderId.valueOf(o.getString("provider")), name=o.optString("name",o.getString("provider")), enabled=o.optBoolean("enabled",true), order=o.optInt("order",i), providerAccountId=o.stringOrNull("providerAccountId"), createdAtEpochSeconds=o.optLong("createdAt",System.currentTimeMillis()/1000))) } } }.sortedWith(compareBy<AccountRecord>{it.order}.thenBy{it.name}) }
     fun upsert(account: AccountRecord) { val items=accounts().toMutableList(); val index=items.indexOfFirst{it.id==account.id}; if(index>=0) items[index]=account else items+=account.copy(order=(items.maxOfOrNull{it.order}?:-1)+1); saveAccounts(normalizeOrder(items)) }
     fun replaceAccounts(items:List<AccountRecord>){saveAccounts(normalizeOrder(items.sortedBy{it.order}))}
     fun setEnabled(accountId:String,enabled:Boolean){saveAccounts(normalizeOrder(accounts().map{if(it.id==accountId)it.copy(enabled=enabled)else it}))}
@@ -19,5 +19,7 @@ class AccountStore(context: Context) {
     fun cooldownUntil(accountId:String):Long?=prefs.getLong("cooldown.$accountId",0).takeIf{it>System.currentTimeMillis()/1000}
     fun clearCooldown(accountId:String){prefs.edit().remove("cooldown.$accountId").apply()}
     private fun normalizeOrder(items:List<AccountRecord>):List<AccountRecord>=items.mapIndexed{index,account->account.copy(order=index)}
-    private fun saveAccounts(items:List<AccountRecord>){val array=JSONArray();items.forEach{a->array.put(JSONObject().put("id",a.id).put("provider",a.provider.name).put("name",a.name).put("enabled",a.enabled).put("order",a.order))};prefs.edit().putString("accounts",array.toString()).apply()}
+    private fun saveAccounts(items:List<AccountRecord>){val array=JSONArray();items.forEach{a->array.put(JSONObject().put("id",a.id).put("provider",a.provider.name).put("name",a.name).put("enabled",a.enabled).put("order",a.order).putNullable("providerAccountId",a.providerAccountId).put("createdAt",a.createdAtEpochSeconds))};prefs.edit().putString("accounts",array.toString()).apply()}
+    private fun JSONObject.putNullable(key:String,value:Any?):JSONObject=put(key,value ?: JSONObject.NULL)
+    private fun JSONObject.stringOrNull(key:String):String?=if(!has(key)||isNull(key))null else optString(key).takeIf{it.isNotBlank()}
 }
