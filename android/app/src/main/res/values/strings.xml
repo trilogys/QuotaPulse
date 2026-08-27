@@ -1,0 +1,37 @@
+<resources>
+    <string name="app_name">AIQuota</string>
+    <string name="app_subtitle">Native Android · Multi-account · OAuth · Home screen widget</string>
+    <string name="accounts">Accounts</string>
+    <string name="account_name_optional">Account name (optional)</string>
+    <string name="refresh_all">Refresh all</string>
+    <string name="refresh">Refresh</string>
+    <string name="hide">Hide</string>
+    <string name="show">Show</string>
+    <string name="delete">Delete</string>
+    <string name="reauthenticate">Re-authenticate</string>
+    <string name="recommended">Recommended</string>
+    <string name="hidden">Hidden</string>
+    <string name="credential_status">Credential: %1$s</string>
+    <string name="credential_healthy">Healthy</string>
+    <string name="credential_saved">Saved</string>
+    <string name="credential_cached">Cached</string>
+    <string name="credential_refreshable">Refreshable</string>
+    <string name="credential_renew_soon">Renewing soon</string>
+    <string name="credential_sign_in_again">Sign in again</string>
+    <string name="no_data">Not refreshed yet</string>
+    <string name="balance">Balance</string>
+    <string name="updated">Updated %1$s</string>
+    <string name="widget_empty">No matching accounts. Long-press the widget to reconfigure.</string>
+    <string name="widget_title">AI QUOTA</string>
+    <string name="widget_cached">Cached</string>
+    <string name="reset_in">Reset in %1$s</string>
+    <string name="oauth_fallback">Advanced/fallback: import existing credentials</string>
+    <string name="access_token">Access Token</string>
+    <string name="api_key">API Key</string>
+    <string name="refresh_token">Refresh Token (recommended)</string>
+    <string name="account_id_optional">ChatGPT Account ID (optional)</string>
+    <string name="import_credentials">Import credentials</string>
+    <string name="update_credentials">Update credentials</string>
+    <string name="cancel_reauth">Cancel re-authentication</string>
+    <string name="reauth_mode">Re-authentication mode: successful login replaces the existing credential</string>
+</resources>
