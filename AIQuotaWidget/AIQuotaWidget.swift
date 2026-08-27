@@ -19,7 +19,7 @@ struct AIQuotaProvider: AppIntentTimelineProvider {
 
   func timeline(for configuration: AIQuotaWidgetConfigurationIntent, in context: Context) async -> Timeline<AIQuotaEntry> {
     let accounts = await configuredAccounts(configuration, family: context.family)
-    _ = await UsageService.shared.refresh(accountIDs: accounts.map(\.id))
+    _ = await CooldownAwareRefresh.shared.refresh(accountIDs: accounts.map(\.id), manual: false)
     let entry = await makeEntry(configuration: configuration, family: context.family, accounts: accounts)
     let minutes = await SharedStore.shared.autoRefreshMinutes()
     return Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(TimeInterval(minutes * 60))))
