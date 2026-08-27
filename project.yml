@@ -42,9 +42,6 @@ targets:
           - CFBundleURLName: AIQuota
             CFBundleURLSchemes:
               - aiquota
-    dependencies:
-      - target: AIQuotaWidget
-        embed: true
 
   AIQuotaWidget:
     type: app-extension
@@ -74,5 +71,13 @@ schemes:
         AIQuotaApp: all
     run:
       config: Debug
+    archive:
+      config: Release
+
+  AIQuotaNativeWidget:
+    build:
+      targets:
+        AIQuotaApp: all
+        AIQuotaWidget: all
     archive:
       config: Release
