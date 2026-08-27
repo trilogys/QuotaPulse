@@ -1,103 +1,89 @@
-# AIQuota Native v0.9.0
+# AIQuota Native v0.9.1
 
 AI 服务额度监控：**原生 iOS + 原生 Android + 桌面小组件 + 多账号 + 本机凭据保存 + 后台刷新**。
 
-当前仓库由原 iOS-only 版本升级为双端工程。iOS 保留已经工作的 WidgetKit / App Intents / OAuth / Keychain 实现；Android 新增 Kotlin + Compose + Glance + WorkManager 实现。
-
 ## Provider
 
-核心目标 Provider：
+- Codex：ChatGPT OAuth / credentials 导入，多账号，动态额度窗口
+- Claude：OAuth / credentials 导入，多账号，5h / 周
+- Kimi：Device OAuth / credentials 导入，多账号，动态额度窗口
+- DeepSeek：API Key，多账号，余额
 
-- Codex：ChatGPT OAuth / 导入已有 credentials，多账号；动态识别实际返回的额度窗口
-- Claude：OAuth / 导入已有 credentials，多账号；5h / 周
-- Kimi：OAuth / 导入已有 credentials，多账号；动态识别实际返回窗口
-- DeepSeek：API Key，多账号；余额
-
-现有 iOS 端还保留 MiniMax、GLM / Z.ai、GitHub Copilot 等适配，后续会逐步同步到 Android。
+iOS 端还保留 MiniMax、GLM / Z.ai、GitHub Copilot 等适配，后续逐步同步 Android。
 
 ## iOS
 
-技术栈：SwiftUI + WidgetKit + App Intents + App Group + Keychain。
+SwiftUI + WidgetKit + App Intents + App Group + Keychain。
 
-已支持：
+已支持多账号、Codex/Claude/Kimi OAuth、DeepSeek API Key、Token refresh、桌面 Widget、Widget 内 `↻` 原地刷新、timeline 自动刷新、stale cache，以及 GitHub Actions 构建 unsigned/signed IPA。
 
-- 多账号独立 UUID
-- Codex / Claude / Kimi OAuth
-- DeepSeek API Key
-- Token refresh
-- 桌面 Widget
-- Widget 内 `↻` 原地刷新，不打开主 App
-- 自动 timeline 刷新
-- stale cache：网络失败时保留上次成功额度
-- GitHub Actions 构建 unsigned / signed IPA
-
-Codex 使用 browser OAuth + PKCE + iPhone 本机 localhost callback，不需要后续依赖电脑或服务器中转。
+Codex 使用 browser OAuth + PKCE + iPhone 本机 localhost callback；日常刷新不依赖电脑或中转服务器。
 
 ## Android
 
-技术栈：Kotlin + Jetpack Compose + Jetpack Glance + WorkManager + Android Keystore/EncryptedSharedPreferences。
+Kotlin + Jetpack Compose + Jetpack Glance + WorkManager + Android Keystore/EncryptedSharedPreferences。
 
-v0.9.0 第一阶段已经加入：
+v0.9.1 已加入：
 
-- 原生 Android App 工程：`android/`
-- Codex / Claude / Kimi / DeepSeek usage Provider
+- Codex browser OAuth + PKCE
+- iPhone 同逻辑的 `localhost:1455` callback；1455 占用时自动尝试备用端口
+- Codex localhost 自动回调失败时，可粘贴完整 callback URL 手动完成
+- Claude OAuth，授权后粘贴 `CODE#STATE`
+- Kimi Device OAuth，浏览器授权 + App 轮询 token
 - Codex / Claude / Kimi refresh token 自动续期
-- DeepSeek API Key 查询余额
+- Kimi device headers 持久化，refresh 与 usage 请求继续复用
+- DeepSeek API Key 余额查询
 - 多账号 Account UUID 隔离
-- 加密凭据存储
-- 本地额度 snapshot cache
-- 网络失败保留旧 snapshot 并标记 stale
-- 15 分钟 WorkManager 后台刷新
+- EncryptedSharedPreferences + Android Keystore 保存敏感凭据
+- 本地 usage snapshot cache；失败时保留旧值并标记 stale
+- WorkManager 每 15 分钟后台刷新
 - Jetpack Glance 桌面 Widget
-- 主 App 添加账号、删除账号、单账号/全部刷新
+- Widget 顶部 `↻` 直接触发后台刷新，不打开主 App
+- 主 App 单账号/全部刷新、删除、OAuth 登录、凭据导入
 - GitHub Actions 自动构建 debug APK
 
-当前 Android 的登录入口先支持 **导入已有 access/refresh token 或 API Key**。下一阶段会把 iOS 已有的 Codex/Claude/Kimi OAuth 登录流程移植为 Android 浏览器 OAuth / localhost callback / callback URL 粘贴 fallback。
-
-## 多账号模型
-
-每个账号都有独立 UUID：
+## 认证策略
 
 ```text
-Provider
-  ├─ Account A
-  │    ├─ Credential
-  │    └─ Usage Snapshot
-  ├─ Account B
-  │    ├─ Credential
-  │    └─ Usage Snapshot
-  └─ Account C
+Codex
+  OAuth + PKCE
+    → localhost 自动 callback
+    → callback URL 手动粘贴 fallback
+    → 已有 credentials 导入 fallback
+
+Claude
+  OAuth 授权页
+    → CODE#STATE 粘贴
+    → credentials 导入 fallback
+
+Kimi
+  Device OAuth
+    → 浏览器确认
+    → App 自动轮询 token
+    → credentials 导入 fallback
+
+DeepSeek
+  API Key
 ```
 
-Token 刷新只更新当前 Account UUID，不会覆盖同 Provider 的其它账号。
+所有账号的 access token / refresh token / API Key 独立保存，刷新某个账号不会覆盖同 Provider 的其它账号。
 
 ## 后台刷新
 
 ### iOS
 
-- WidgetKit timeline 请求后台刷新
-- 用户可以设置 10 / 15 / 30 / 60 / 120 分钟的最早刷新请求
-- 最终后台调度时间由 iOS 决定
-- Interactive Widget `↻` 可以立即执行刷新且 `openAppWhenRun = false`
+WidgetKit timeline 请求自动刷新；设置可选 10 / 15 / 30 / 60 / 120 分钟的最早请求时间。实际调度由 iOS 决定。Interactive Widget `↻` 可以立即执行刷新且不打开 App。
 
 ### Android
 
-- WorkManager 每 15 分钟安排一次网络刷新
-- 只在网络可用时执行
-- 刷新完成调用 Glance `updateAll()` 更新桌面 Widget
-- 打开 App 也可以手动刷新全部或单账号
+WorkManager 以 15 分钟周期安排网络刷新；Widget `↻` 会提交一次 OneTimeWorkRequest，完成后调用 Glance `updateAll()` 更新桌面小组件。
 
 ## 安全
 
-### iOS
-
-OAuth token / API Key 存共享 Keychain，按 Account UUID 隔离。
-
-### Android
-
-OAuth token / API Key 存 EncryptedSharedPreferences，主密钥由 Android Keystore 管理。账号名称和使用量缓存不保存 token。
-
-任何日志和 Widget 都不应该输出完整 token、refresh token、Cookie 或 API Key。
+- iOS：OAuth token / API Key 存共享 Keychain，按 Account UUID 隔离。
+- Android：OAuth token / API Key 存 EncryptedSharedPreferences，主密钥由 Android Keystore 管理。
+- 普通账号配置和 Widget snapshot 不保存 token。
+- 日志、Widget、错误提示不得输出完整 token、refresh token、Cookie 或 API Key。
 
 ## 项目结构
 
@@ -105,56 +91,32 @@ OAuth token / API Key 存 EncryptedSharedPreferences，主密钥由 Android Keys
 AIQuotaApp/                       iOS 主 App / OAuth / 多账号
 AIQuotaWidget/                    iOS WidgetKit Interactive Widget
 Shared/                           iOS Provider / Keychain / App Intents
-android/                          Android 原生工程
-  app/src/main/java/.../core/     Android Account / Credential / Usage
-  app/src/main/java/.../widget/   Jetpack Glance Widget
+android/
+  app/src/main/java/.../auth/     Android OAuth / PKCE / Device Flow
+  app/src/main/java/.../core/     Account / Credential / Provider / Usage
+  app/src/main/java/.../widget/   Jetpack Glance Widget / refresh action
   app/src/main/java/.../work/     WorkManager 后台刷新
 .github/workflows/ipa.yml         iOS IPA
 .github/workflows/android.yml     Android APK
 Scripts/                          iOS 构建/签名脚本
-Config.xcconfig
-project.yml
-IPA.md
-SIGNING.md
 ```
 
-## 构建 iOS IPA
+## 构建
 
-GitHub Actions：
+iOS：`Actions → ipa → Run workflow`，支持 unsigned IPA 和 p12 + mobileprovision signed IPA，详见 `IPA.md` / `SIGNING.md`。
 
-```text
-Actions → ipa → Run workflow
-```
+Android：`Actions → Android → Run workflow`，成功后下载 `AIQuota-Android-debug/app-debug.apk`。
 
-支持 unsigned IPA 和使用自己的 p12 + mobileprovision 生成 signed IPA。详细见 [`IPA.md`](IPA.md) 与 [`SIGNING.md`](SIGNING.md)。
-
-## 构建 Android APK
-
-GitHub Actions：
-
-```text
-Actions → Android → Run workflow
-```
-
-成功后下载 artifact：
-
-```text
-AIQuota-Android-debug
-└─ app-debug.apk
-```
-
-Android 当前使用 API 37 / AGP 9.1 / Gradle 9.3.1 / Compose 2026.08 / Glance 1.2。
+Android 当前工具链：API 37 / AGP 9.3 / Gradle 9.5 / Compose 2026.08 / Glance 1.2。
 
 ## 下一阶段
 
-优先顺序：
+1. Android Widget 配置：选择 Provider / 账号 / 显示条数
+2. Android 单账号 Widget 刷新按钮
+3. 两端统一账号排序、启用/隐藏与推荐账号
+4. 80% / 90% / 100% 阈值提醒
+5. Gemini / OpenRouter / Cursor / Copilot 等 Provider 扩展
+6. 中英文完整本地化
+7. OAuth 与 Provider fixture/contract tests
 
-1. Android Codex OAuth + PKCE + localhost/manual callback fallback
-2. Android Claude OAuth
-3. Android Kimi Device/OAuth
-4. Android Widget 手动刷新按钮与 Widget 配置
-5. 两端统一账号排序、隐藏、推荐账号与额度阈值提醒
-6. Gemini / OpenRouter / Cursor / Copilot 等 Provider 扩展
-7. 中英文完整本地化
-
-项目原则：**手机自己查询额度，电脑最多只作为首次导入凭据的可选方式；日常刷新不依赖 Mac、Windows、Linux 或中转服务器。**
+项目原则：**手机自己查询额度；电脑最多只作为首次 credentials 导入的可选方式，日常刷新不依赖 Mac、Windows、Linux 或中转服务器。**
