@@ -1,7 +1,20 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+val releaseStoreFile = providers.environmentVariable("AIQUOTA_RELEASE_STORE_FILE").orNull
+val releaseStorePassword = providers.environmentVariable("AIQUOTA_RELEASE_STORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("AIQUOTA_RELEASE_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("AIQUOTA_RELEASE_KEY_PASSWORD").orNull
+val hasReleaseSigning = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword
+).all { !it.isNullOrBlank() }
 
 android {
     namespace = "com.trilogys.aiquota"
@@ -11,8 +24,26 @@ android {
         applicationId = "com.trilogys.aiquota"
         minSdk = 26
         targetSdk = 37
-        versionCode = 901
-        versionName = "0.9.1"
+        versionCode = 1000
+        versionName = "0.10.0"
+    }
+
+    if (hasReleaseSigning) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            if (hasReleaseSigning) signingConfig = signingConfigs.getByName("release")
+        }
     }
 
     buildFeatures { compose = true }
