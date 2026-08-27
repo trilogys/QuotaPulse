@@ -58,7 +58,13 @@ struct AIQuotaProvider: AppIntentTimelineProvider {
     family: WidgetFamily,
     accounts suppliedAccounts: [AccountRecord]? = nil
   ) async -> AIQuotaEntry {
-    let accounts = suppliedAccounts ?? configuredAccounts(configuration, family: family)
+    let accounts: [AccountRecord]
+    if let suppliedAccounts {
+      accounts = suppliedAccounts
+    } else {
+      accounts = await configuredAccounts(configuration, family: family)
+    }
+
     var items: [WidgetDisplayItem] = []
     for account in accounts {
       items.append(
@@ -80,7 +86,8 @@ struct AIQuotaProvider: AppIntentTimelineProvider {
     _ configuration: AIQuotaWidgetConfigurationIntent,
     family: WidgetFamily
   ) async -> [AccountRecord] {
-    let enabled = await SharedStore.shared.accounts().filter(\.isEnabled)
+    let allAccounts = await SharedStore.shared.accounts()
+    let enabled = allAccounts.filter(\.isEnabled)
     let filtered: [AccountRecord]
 
     switch configuration.mode {
