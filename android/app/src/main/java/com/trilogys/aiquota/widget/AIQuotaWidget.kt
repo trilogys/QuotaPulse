@@ -48,7 +48,6 @@ class AIQuotaWidget : GlanceAppWidget() {
 
 class AIQuotaWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = AIQuotaWidget()
-
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
         val store = WidgetConfigStore(context)
@@ -57,10 +56,7 @@ class AIQuotaWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 @Composable
-private fun WidgetContent(
-    rows: List<Pair<AccountRecord, UsageSnapshot?>>,
-    layout: WidgetConfigStore.Layout
-) {
+private fun WidgetContent(rows: List<Pair<AccountRecord, UsageSnapshot?>>, layout: WidgetConfigStore.Layout) {
     Column(GlanceModifier.fillMaxSize().padding(12.dp)) {
         Row {
             Text("AI QUOTA", style = TextStyle(fontWeight = FontWeight.Bold))
@@ -77,10 +73,7 @@ private fun WidgetContent(
                 }
                 Spacer(GlanceModifier.height(if (layout == WidgetConfigStore.Layout.DETAILED) 6.dp else 3.dp))
             }
-            val latest = rows.mapNotNull { it.second?.updatedAtEpochSeconds }.maxOrNull()
-            if (latest != null) {
-                Text("更新 ${formatTime(latest)}")
-            }
+            rows.mapNotNull { it.second?.updatedAtEpochSeconds }.maxOrNull()?.let { Text("更新 ${formatTime(it)}") }
         }
     }
 }
@@ -96,10 +89,7 @@ private fun CompactAccountRow(account: AccountRecord, snapshot: UsageSnapshot?) 
 @Composable
 private fun DetailedAccountRow(account: AccountRecord, snapshot: UsageSnapshot?) {
     Column {
-        Text(
-            "${account.provider.name} · ${account.name}",
-            style = TextStyle(fontWeight = FontWeight.Medium)
-        )
+        Text("${account.provider.name} · ${account.name}", style = TextStyle(fontWeight = FontWeight.Medium))
         if (snapshot == null) {
             Text("尚未刷新")
         } else if (snapshot.stale) {
@@ -108,7 +98,7 @@ private fun DetailedAccountRow(account: AccountRecord, snapshot: UsageSnapshot?)
             Text("余额 ${snapshot.balance.symbol}${"%.2f".format(snapshot.balance.total)}")
         } else {
             Text(snapshot.windows.take(2).joinToString(" · ") {
-                val reset = it.resetAtEpochSeconds?.let(::formatTime)
+                val reset = it.resetAtEpochSeconds?.let(::formatCountdown)
                 if (reset == null) "${it.label} ${it.remainingPercent.roundToInt()}%"
                 else "${it.label} ${it.remainingPercent.roundToInt()}% ↻$reset"
             })
@@ -121,6 +111,18 @@ private fun summary(snapshot: UsageSnapshot?): String {
     if (snapshot.stale) return "⚠ ${snapshot.windows.firstOrNull()?.remainingPercent?.roundToInt() ?: "--"}%"
     snapshot.balance?.let { return "${it.symbol}${"%.2f".format(it.total)}" }
     return snapshot.windows.take(2).joinToString(" · ") { "${it.label} ${it.remainingPercent.roundToInt()}%" }
+}
+
+private fun formatCountdown(epochSeconds: Long): String {
+    val remaining = (epochSeconds - System.currentTimeMillis() / 1000).coerceAtLeast(0)
+    val days = remaining / 86400
+    val hours = (remaining % 86400) / 3600
+    val minutes = (remaining % 3600) / 60
+    return when {
+        days > 0 -> "${days}d ${hours}h"
+        hours > 0 -> "${hours}h ${minutes}m"
+        else -> "${minutes.coerceAtLeast(1)}m"
+    }
 }
 
 private fun formatTime(epochSeconds: Long): String =
