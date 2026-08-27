@@ -24,6 +24,9 @@ targets:
     sources:
       - path: Shared
       - path: AIQuotaApp
+    dependencies:
+      - target: AIQuotaWidget
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(AIQUOTA_APP_BUNDLE_ID)
