@@ -5,6 +5,11 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/ipa.yml'
+      - 'project.yml'
+      - 'Config.xcconfig'
+      - 'AIQuotaApp/**'
+      - 'AIQuotaWidget/**'
+      - 'Shared/**'
       - 'Scripts/build_unsigned_ipa.sh'
       - 'Scripts/build_signed_ipa.sh'
       - 'Scripts/verify_ipa_structure.sh'
