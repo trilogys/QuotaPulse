@@ -8,6 +8,7 @@
     <string name="hide">Hide</string>
     <string name="show">Show</string>
     <string name="delete">Delete</string>
+    <string name="save">Save</string>
     <string name="reauthenticate">Re-authenticate</string>
     <string name="recommended">Recommended</string>
     <string name="hidden">Hidden</string>
@@ -25,6 +26,16 @@
     <string name="widget_title">AI QUOTA</string>
     <string name="widget_cached">Cached</string>
     <string name="reset_in">Reset in %1$s</string>
+    <string name="widget_config_title">Configure AIQuota widget</string>
+    <string name="widget_config_subtitle">Each widget can independently choose content, layout, and row count. Small sizes automatically use compact layout.</string>
+    <string name="widget_content">Content</string>
+    <string name="widget_all_accounts">All accounts</string>
+    <string name="widget_provider_only">Only %1$s</string>
+    <string name="widget_single_account">Single account</string>
+    <string name="widget_layout">Layout</string>
+    <string name="widget_compact">Compact</string>
+    <string name="widget_detailed">Detailed</string>
+    <string name="widget_rows">Rows</string>
     <string name="oauth_fallback">Advanced/fallback: import existing credentials</string>
     <string name="access_token">Access Token</string>
     <string name="api_key">API Key</string>
