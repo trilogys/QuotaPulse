@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/ipa.yml'
+      - 'Scripts/build_unsigned_ipa.sh'
+      - 'Scripts/build_signed_ipa.sh'
+      - 'Scripts/verify_ipa_structure.sh'
+      - 'IPA.md'
   workflow_dispatch:
     inputs:
       build_type:
@@ -71,14 +75,15 @@ jobs:
           [[ -n "${APP_GROUP:-}" ]] && args+=(--app-group "$APP_GROUP")
           [[ -n "${KEYCHAIN_SUFFIX:-}" ]] && args+=(--keychain-suffix "$KEYCHAIN_SUFFIX")
           ./Scripts/build_unsigned_ipa.sh "${args[@]}"
-          shasum -a 256 build/unsigned-export/AIQuota-unsigned.ipa > build/unsigned-export/AIQuota-unsigned.ipa.sha256
-      - name: Upload unsigned IPA
+      - name: Upload unsigned/re-sign IPA
         uses: actions/upload-artifact@v4
         with:
-          name: AIQuota-unsigned
+          name: AIQuota-iOS-resign
           path: |
             build/unsigned-export/AIQuota-unsigned.ipa
             build/unsigned-export/AIQuota-unsigned.ipa.sha256
+            build/unsigned-export/AIQuota-resign.ipa
+            build/unsigned-export/AIQuota-resign.ipa.sha256
             build/unsigned-export/AIQuota-unsigned-signing-info.txt
           if-no-files-found: error
           retention-days: 14
