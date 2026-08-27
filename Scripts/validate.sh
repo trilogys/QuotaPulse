@@ -19,6 +19,17 @@ ks=Path('Shared/KeychainStore.swift').read_text()
 assert 'discoverDefaultAccessGroup' in ks
 assert 'kSecAttrAccessGroup' in ks
 print('v0.8 runtime keychain resolution: ok')
+
+models=Path('Shared/Models.swift').read_text()
+health=Path('Shared/ProviderHealth.swift').read_text()
+store=Path('Shared/SharedStore.swift').read_text()
+for case in ['authentication', 'rateLimited', 'providerUnavailable', 'network', 'invalidResponse', 'configuration', 'unknown']:
+    assert f'case {case}' in models, case
+assert 'effectiveErrorKind' in health
+assert 'healthState' in health
+assert 'HTTP 401' not in health  # classifier matches status fragments, not provider-specific hardcoding
+assert 'kind: ProviderErrorKind?' in store
+print('provider health contracts: ok')
 PY
 
 for s in Scripts/*.sh; do bash -n "$s"; done
