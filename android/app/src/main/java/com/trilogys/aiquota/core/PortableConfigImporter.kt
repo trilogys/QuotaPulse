@@ -15,13 +15,21 @@ class PortableConfigManager(context:Context) {
         val imported=PortableConfigCodec.decode(raw)
         val old=accounts.accounts()
         val result=if(mode==PortableImportMode.REPLACE) mutableListOf() else old.toMutableList()
-        if(mode==PortableImportMode.REPLACE) old.forEach{credentials.delete(it.id)}
+        if(mode==PortableImportMode.REPLACE) old.forEach { oldAccount ->
+            credentials.delete(oldAccount.id)
+            accounts.delete(oldAccount.id) // also removes stale snapshot/cooldown data
+        }
         var added=0;var updated=0;var credentialCount=0
         imported.forEach { item ->
-            val match=result.indexOfFirst { current -> current.id==item.record.id || (item.providerAccountId!=null && current.provider==item.record.provider && credentials.get(current.id)?.accountId==item.providerAccountId) }
+            val match=result.indexOfFirst { current ->
+                current.id==item.record.id || (
+                    item.providerAccountId!=null && current.provider==item.record.provider &&
+                    (current.providerAccountId==item.providerAccountId || credentials.get(current.id)?.accountId==item.providerAccountId)
+                )
+            }
             if(match>=0){
                 val target=result[match]
-                result[match]=item.record.copy(id=target.id)
+                result[match]=item.record.copy(id=target.id, providerAccountId=item.providerAccountId ?: target.providerAccountId, createdAtEpochSeconds=target.createdAtEpochSeconds)
                 item.credential?.let{credentials.save(target.id,it);credentialCount++}
                 updated++
             } else {
