@@ -24,14 +24,19 @@ iOS 端还保留 MiniMax、GLM / Z.ai、GitHub Copilot 等适配，后续逐步�
 - OAuth token 自动 refresh
 - 多账号 UUID 隔离
 - 账号重命名、启用/隐藏、排序
-- 每个 Provider 自动标记推荐账号：额度型 Provider 按“最紧张窗口剩余最多”选择；余额型 Provider 按余额选择
+- 每个 Provider 自动标记推荐账号
 - WidgetKit 桌面 Widget
 - Widget 内 `↻` 原地刷新，不打开主 App
 - Widget timeline 自动刷新
 - stale cache：网络失败保留上次成功数据
+- 80% / 90% / 约 100% 已用额度分级通知，按账号/额度窗口去重
+- 主 App 首次运行请求通知权限
+- Shared `UsageService` 统一执行阈值判断，因此主 App 与 Widget/App Intent 刷新共用同一规则
 - GitHub Actions 构建 unsigned / signed IPA
 
 Codex 使用 browser OAuth + PKCE + iPhone 本机 localhost callback；日常刷新不依赖电脑或中转服务器。
+
+最新 iOS Simulator CI 已验证通知权限、Shared 通知器、UsageService 接入与账号排序均可编译通过。
 
 ## Android
 
@@ -53,6 +58,8 @@ v0.10.0 已形成可安装闭环：
 - WorkManager 每 15 分钟后台刷新
 - Jetpack Glance 桌面 Widget
 - Widget 独立配置：全部账号 / 单 Provider / 单账号
+- Widget 独立布局：紧凑 / 详细
+- Widget 独立显示条数：1 / 2 / 4 / 6 / 8
 - 每个 Widget 配置按 `appWidgetId` 独立保存
 - Widget `↻` 不打开 App；总览刷新全部、Provider Widget 只刷新该 Provider、单账号 Widget 只刷新该账号
 - 账号显示/隐藏、上下排序
@@ -60,6 +67,7 @@ v0.10.0 已形成可安装闭环：
 - 80% / 90% / 约 100% 已用额度分级通知，并按账号/窗口去重
 - Android 13+ 请求通知权限
 - GitHub Actions 自动构建 debug APK
+- 可选 GitHub Actions 正式签名 release APK
 
 ### 已验证 Android 构建
 
@@ -108,6 +116,7 @@ DeepSeek
 - Widget `↻` 使用 OneTimeWorkRequest
 - Worker 根据当前 Widget 配置缩小请求范围
 - 完成后调用 Glance `updateAll()` 更新桌面 Widget
+- 每个 Widget 可以独立配置筛选范围、紧凑/详细模式与显示条数
 
 ## 推荐账号规则
 
@@ -124,21 +133,39 @@ DeepSeek 等余额型 Provider 则按可用余额比较。
 
 ## 额度提醒
 
-Android 当前默认分三级：
+iOS 与 Android 当前统一三级：
 
 - 已用约 80%：剩余 ≤ 20%
 - 已用约 90%：剩余 ≤ 10%
 - 已用约 100%：剩余 ≤ 0.5%
 
-同一账号、同一额度窗口、同一级别不会被 15 分钟后台任务反复通知；额度恢复到安全区后会重置提醒状态。
+同一账号、同一额度窗口、同一级别不会被后台刷新反复通知；额度恢复到安全区后会重置提醒状态。
 
-iOS 的同规则系统通知仍在后续同步计划中。
+## Android Release APK
+
+默认 workflow 始终生成 debug APK。若希望完全通过 GitHub Actions 生成正式签名 APK，在仓库 `Settings → Secrets and variables → Actions` 配置：
+
+```text
+ANDROID_KEYSTORE_BASE64
+ANDROID_KEYSTORE_PASSWORD
+ANDROID_KEY_ALIAS
+ANDROID_KEY_PASSWORD
+```
+
+`ANDROID_KEYSTORE_BASE64` 是 Android keystore 文件的 Base64 内容。配置完成后运行 `Actions → Android`，会额外生成：
+
+```text
+AIQuota-Android-release/app-release.apk
+```
+
+签名文件和密码只进入 GitHub Actions Secrets，不写入仓库源码。
 
 ## 安全
 
 - iOS：OAuth token / API Key 存共享 Keychain，按 Account UUID 隔离
 - Android：OAuth token / API Key 存 EncryptedSharedPreferences，主密钥由 Android Keystore 管理
 - 普通账号配置和 Widget snapshot 不保存 token
+- Android release keystore/password 不进入 Git 仓库
 - 日志、Widget、错误提示不应输出完整 token、refresh token、Cookie 或 API Key
 
 ## 项目结构
@@ -146,14 +173,14 @@ iOS 的同规则系统通知仍在后续同步计划中。
 ```text
 AIQuotaApp/                       iOS 主 App / OAuth / 多账号
 AIQuotaWidget/                    iOS WidgetKit Interactive Widget
-Shared/                           iOS Provider / Keychain / App Intents
+Shared/                           iOS Provider / Keychain / App Intents / Alerts
 android/
   app/src/main/java/.../auth/     Android OAuth / PKCE / Device Flow
-  app/src/main/java/.../core/     Account / Credential / Provider / Usage / Alerts
+  app/src/main/java/.../core/     Account / Credential / Provider / Usage
   app/src/main/java/.../widget/   Glance Widget / config / refresh action
-  app/src/main/java/.../work/     WorkManager 后台刷新
+  app/src/main/java/.../work/     WorkManager / quota alerts
 .github/workflows/ipa.yml         iOS IPA
-.github/workflows/android.yml     Android APK
+.github/workflows/android.yml     Android debug/release APK
 Scripts/                          iOS 构建/签名脚本
 ```
 
@@ -161,18 +188,17 @@ Scripts/                          iOS 构建/签名脚本
 
 iOS：`Actions → ipa → Run workflow`，支持 unsigned IPA 和 p12 + mobileprovision signed IPA，详见 `IPA.md` / `SIGNING.md`。
 
-Android：`Actions → Android → Run workflow`，成功后下载 `AIQuota-Android-debug`，解压得到 `app-debug.apk`。
+Android：`Actions → Android → Run workflow`。默认下载 `AIQuota-Android-debug`；配置签名 Secrets 后还会生成 `AIQuota-Android-release`。
 
 Android 当前工具链：API 37 / AGP 9.3 / Gradle 9.5 / Compose 2026.08 / Glance 1.2。
 
 ## 下一阶段
 
-1. iOS 同步 80% / 90% / 100% 系统额度提醒
-2. Android Widget 显示条数、紧凑/详细布局配置
-3. 两端完整中英文本地化
-4. Provider fixture / contract tests，降低上游 API 格式变化风险
-5. Gemini / OpenRouter / Cursor / Copilot 等 Provider 扩展
-6. Release APK / AAB 签名和版本发布流程
-7. OAuth 登录状态诊断、凭据健康检查与一键重新认证
+1. 两端完整中英文本地化
+2. Provider fixture / contract tests，降低上游 API 格式变化风险
+3. Gemini / OpenRouter / Cursor / Android Copilot 等 Provider 扩展
+4. Android AAB / GitHub Release 自动发布
+5. OAuth 登录状态诊断、凭据健康检查与一键重新认证
+6. Widget 自适应尺寸与更完整的视觉状态
 
 项目原则：**手机自己查询额度；电脑最多只作为首次 credentials 导入的可选方式，日常刷新不依赖 Mac、Windows、Linux 或中转服务器。**
