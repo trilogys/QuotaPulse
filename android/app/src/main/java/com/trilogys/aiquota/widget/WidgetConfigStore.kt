@@ -9,10 +9,13 @@ class WidgetConfigStore(context: Context) {
     data class Config(
         val mode: Mode = Mode.ALL,
         val provider: ProviderId? = null,
-        val accountId: String? = null
+        val accountId: String? = null,
+        val layout: Layout = Layout.COMPACT,
+        val maxRows: Int = 4
     )
 
     enum class Mode { ALL, PROVIDER, ACCOUNT }
+    enum class Layout { COMPACT, DETAILED }
 
     fun get(appWidgetId: Int): Config {
         val mode = runCatching { Mode.valueOf(prefs.getString("$appWidgetId.mode", Mode.ALL.name) ?: Mode.ALL.name) }
@@ -21,7 +24,11 @@ class WidgetConfigStore(context: Context) {
             runCatching { ProviderId.valueOf(it) }.getOrNull()
         }
         val accountId = prefs.getString("$appWidgetId.account", null)
-        return Config(mode, provider, accountId)
+        val layout = runCatching {
+            Layout.valueOf(prefs.getString("$appWidgetId.layout", Layout.COMPACT.name) ?: Layout.COMPACT.name)
+        }.getOrDefault(Layout.COMPACT)
+        val maxRows = prefs.getInt("$appWidgetId.maxRows", 4).coerceIn(1, 8)
+        return Config(mode, provider, accountId, layout, maxRows)
     }
 
     fun save(appWidgetId: Int, config: Config) {
@@ -29,6 +36,8 @@ class WidgetConfigStore(context: Context) {
             .putString("$appWidgetId.mode", config.mode.name)
             .putString("$appWidgetId.provider", config.provider?.name)
             .putString("$appWidgetId.account", config.accountId)
+            .putString("$appWidgetId.layout", config.layout.name)
+            .putInt("$appWidgetId.maxRows", config.maxRows.coerceIn(1, 8))
             .apply()
     }
 
@@ -37,6 +46,8 @@ class WidgetConfigStore(context: Context) {
             .remove("$appWidgetId.mode")
             .remove("$appWidgetId.provider")
             .remove("$appWidgetId.account")
+            .remove("$appWidgetId.layout")
+            .remove("$appWidgetId.maxRows")
             .apply()
     }
 }
