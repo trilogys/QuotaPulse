@@ -25,6 +25,7 @@ struct ContentView: View {
                 account: account,
                 snapshot: model.snapshots[account.id],
                 recommended: recommendedAccountIDs.contains(account.id),
+                health: model.credentialHealth(account),
                 onRefresh: { await model.refresh(account) },
                 onToggle: { enabled in await model.setEnabled(account, enabled: enabled) }
               )
@@ -84,11 +85,7 @@ struct ContentView: View {
       .navigationTitle("AI Quota")
       .toolbar {
         ToolbarItem(placement: .topBarLeading) {
-          Button {
-            showingSettings = true
-          } label: {
-            Image(systemName: "gearshape")
-          }
+          Button { showingSettings = true } label: { Image(systemName: "gearshape") }
         }
         ToolbarItem(placement: .topBarTrailing) {
           Menu {
@@ -100,9 +97,7 @@ struct ContentView: View {
             Button("MiniMax · Coding Key") { apiProvider = .minimax }
             Button("GLM · Coding Key") { apiProvider = .glm }
             Button("GitHub Copilot · Token") { apiProvider = .copilot }
-          } label: {
-            Image(systemName: "plus")
-          }
+          } label: { Image(systemName: "plus") }
         }
       }
       .overlay {
@@ -117,30 +112,14 @@ struct ContentView: View {
       }
       .task { await model.load() }
       .refreshable { await model.refreshAll() }
-      .alert(
-        "错误",
-        isPresented: Binding(
-          get: { model.errorMessage != nil },
-          set: { if !$0 { model.errorMessage = nil } }
-        )
-      ) {
+      .alert("错误", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
         Button("好", role: .cancel) { model.errorMessage = nil }
-      } message: {
-        Text(model.errorMessage ?? "")
-      }
-      .alert(
-        "重命名账号",
-        isPresented: Binding(
-          get: { renameTarget != nil },
-          set: { if !$0 { renameTarget = nil } }
-        )
-      ) {
+      } message: { Text(model.errorMessage ?? "") }
+      .alert("重命名账号", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
         TextField("账号名称", text: $renameText)
         Button("取消", role: .cancel) { renameTarget = nil }
         Button("保存") {
-          if let target = renameTarget {
-            Task { await model.rename(target, label: renameText) }
-          }
+          if let target = renameTarget { Task { await model.rename(target, label: renameText) } }
           renameTarget = nil
         }
       }
@@ -149,29 +128,20 @@ struct ContentView: View {
           await model.addAPIKey(provider: provider, key: key, baseURL: baseURL)
         }
       }
-      .sheet(isPresented: $showingSettings) {
-        SettingsView(model: model)
-      }
+      .sheet(isPresented: $showingSettings) { SettingsView(model: model) }
     }
   }
 
   private var recommendedAccountIDs: Set<UUID> {
     Set(ProviderID.allCases.compactMap { provider in
-      model.accounts
-        .filter { $0.isEnabled && $0.provider == provider }
-        .compactMap { account -> (UUID, Double)? in
-          guard let snapshot = model.snapshots[account.id], !snapshot.stale else { return nil }
-          let score: Double
-          if let balance = snapshot.balance {
-            score = balance.total
-          } else if let minimum = snapshot.windows.map(\.remainingPercent).min() {
-            score = minimum
-          } else {
-            return nil
-          }
-          return (account.id, score)
-        }
-        .max(by: { $0.1 < $1.1 })?.0
+      model.accounts.filter { $0.isEnabled && $0.provider == provider }.compactMap { account -> (UUID, Double)? in
+        guard let snapshot = model.snapshots[account.id], !snapshot.stale else { return nil }
+        let score: Double
+        if let balance = snapshot.balance { score = balance.total }
+        else if let minimum = snapshot.windows.map(\.remainingPercent).min() { score = minimum }
+        else { return nil }
+        return (account.id, score)
+      }.max(by: { $0.1 < $1.1 })?.0
     })
   }
 
@@ -195,9 +165,9 @@ private struct AccountRow: View {
   let account: AccountRecord
   let snapshot: UsageSnapshot?
   let recommended: Bool
+  let health: CredentialHealth
   let onRefresh: () async -> Void
   let onToggle: (Bool) async -> Void
-
   @State private var refreshing = false
 
   var body: some View {
@@ -205,53 +175,31 @@ private struct AccountRow: View {
       HStack {
         VStack(alignment: .leading, spacing: 2) {
           HStack(spacing: 5) {
-            Text(account.label)
-              .font(.headline)
+            Text(account.label).font(.headline)
             if recommended {
-              Label("推荐", systemImage: "star.fill")
-                .labelStyle(.iconOnly)
-                .foregroundStyle(.yellow)
-                .accessibilityLabel("推荐账号")
+              Label("推荐", systemImage: "star.fill").labelStyle(.iconOnly).foregroundStyle(.yellow).accessibilityLabel("推荐账号")
             }
           }
-          Text(account.provider.title)
-            .font(.caption)
-            .foregroundStyle(.secondary)
+          HStack(spacing: 6) {
+            Text(account.provider.title)
+            Label(health.title, systemImage: health.icon)
+              .foregroundStyle(health.color)
+          }
+          .font(.caption)
         }
         Spacer()
-        Toggle(
-          "显示",
-          isOn: Binding(
-            get: { account.isEnabled },
-            set: { value in Task { await onToggle(value) } }
-          )
-        )
-        .labelsHidden()
+        Toggle("显示", isOn: Binding(get: { account.isEnabled }, set: { value in Task { await onToggle(value) } })).labelsHidden()
         Button {
           refreshing = true
-          Task {
-            await onRefresh()
-            refreshing = false
-          }
+          Task { await onRefresh(); refreshing = false }
         } label: {
-          if refreshing {
-            ProgressView().controlSize(.small)
-          } else {
-            Image(systemName: "arrow.clockwise")
-          }
-        }
-        .buttonStyle(.borderless)
+          if refreshing { ProgressView().controlSize(.small) } else { Image(systemName: "arrow.clockwise") }
+        }.buttonStyle(.borderless)
       }
 
-      if let snapshot {
-        SnapshotSummary(snapshot: snapshot)
-      } else {
-        Text("尚未获取额度")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-      }
-    }
-    .padding(.vertical, 3)
+      if let snapshot { SnapshotSummary(snapshot: snapshot) }
+      else { Text("尚未获取额度").font(.caption).foregroundStyle(.secondary) }
+    }.padding(.vertical, 3)
   }
 }
 
@@ -260,43 +208,47 @@ private struct SnapshotSummary: View {
 
   var body: some View {
     if let balance = snapshot.balance {
-      HStack {
-        Text("余额")
-        Spacer()
-        Text("\(balance.symbol)\(balance.total, specifier: "%.2f")")
-          .fontWeight(.semibold)
-      }
-      .font(.subheadline)
+      HStack { Text("余额"); Spacer(); Text("\(balance.symbol)\(balance.total, specifier: "%.2f")").fontWeight(.semibold) }.font(.subheadline)
     } else if !snapshot.windows.isEmpty {
       VStack(spacing: 5) {
         ForEach(snapshot.windows.prefix(3)) { window in
-          HStack {
-            Text(window.label)
-              .frame(width: 48, alignment: .leading)
-            ProgressView(value: window.remainingPercent, total: 100)
-            Text("\(Int(window.remainingPercent.rounded()))%")
-              .monospacedDigit()
-              .frame(width: 44, alignment: .trailing)
+          VStack(spacing: 2) {
+            HStack {
+              Text(window.label).frame(width: 48, alignment: .leading)
+              ProgressView(value: window.remainingPercent, total: 100)
+              Text("\(Int(window.remainingPercent.rounded()))%").monospacedDigit().frame(width: 44, alignment: .trailing)
+            }.font(.caption)
+            if let reset = window.resetAt, reset > .now {
+              HStack { Spacer(); Text("重置 \(resetCountdown(reset))").font(.caption2).foregroundStyle(.secondary) }
+            }
           }
-          .font(.caption)
         }
       }
     } else {
-      HStack {
-        ForEach(snapshot.metrics.prefix(2)) { metric in
-          Text("\(metric.label)：\(metric.value)")
-        }
-      }
-      .font(.caption)
+      HStack { ForEach(snapshot.metrics.prefix(2)) { metric in Text("\(metric.label)：\(metric.value)") } }.font(.caption)
     }
 
     HStack(spacing: 6) {
       Text("更新 \(snapshot.fetchedAt.formatted(date: .omitted, time: .shortened))")
       if snapshot.stale { Text("缓存").foregroundStyle(.orange) }
-    }
-    .font(.caption2)
-    .foregroundStyle(.secondary)
+    }.font(.caption2).foregroundStyle(.secondary)
   }
+}
+
+private func resetCountdown(_ date: Date) -> String {
+  let seconds = max(0, Int(date.timeIntervalSinceNow))
+  let days = seconds / 86400
+  let hours = (seconds % 86400) / 3600
+  let minutes = (seconds % 3600) / 60
+  if days > 0 { return "\(days)天 \(hours)小时" }
+  if hours > 0 { return "\(hours)小时 \(minutes)分" }
+  return "\(max(1, minutes))分"
+}
+
+struct CredentialHealth {
+  let title: String
+  let icon: String
+  let color: Color
 }
 
 struct SettingsView: View {
@@ -309,43 +261,31 @@ struct SettingsView: View {
       Form {
         Section("自动刷新") {
           Picker("最早刷新间隔", selection: $autoMinutes) {
-            Text("10 分钟").tag(10)
-            Text("15 分钟").tag(15)
-            Text("30 分钟").tag(30)
-            Text("1 小时").tag(60)
-            Text("2 小时").tag(120)
+            Text("10 分钟").tag(10); Text("15 分钟").tag(15); Text("30 分钟").tag(30); Text("1 小时").tag(60); Text("2 小时").tag(120)
           }
           Text("这是 WidgetKit 的最早刷新时间，实际自动刷新由 iOS 调度；小组件里的 ↻ 属于用户主动刷新，会立即执行 App Intent。")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+            .font(.footnote).foregroundStyle(.secondary)
         }
-
+        Section("凭据状态") {
+          ForEach(model.accounts) { account in
+            let health = model.credentialHealth(account)
+            HStack {
+              VStack(alignment: .leading) { Text(account.label); Text(account.provider.title).font(.caption).foregroundStyle(.secondary) }
+              Spacer()
+              Label(health.title, systemImage: health.icon).foregroundStyle(health.color).font(.caption)
+            }
+          }
+        }
         Section("显示账号") {
           ForEach(model.accounts) { account in
-            Toggle(
-              account.label,
-              isOn: Binding(
-                get: { account.isEnabled },
-                set: { value in Task { await model.setEnabled(account, enabled: value) } }
-              ))
+            Toggle(account.label, isOn: Binding(get: { account.isEnabled }, set: { value in Task { await model.setEnabled(account, enabled: value) } }))
           }
         }
       }
       .navigationTitle("设置")
-      .toolbar {
-        ToolbarItem(placement: .confirmationAction) {
-          Button("完成") { dismiss() }
-        }
-      }
-      .task {
-        autoMinutes = await SharedStore.shared.autoRefreshMinutes()
-      }
-      .onChange(of: autoMinutes) { _, newValue in
-        Task {
-          await SharedStore.shared.setAutoRefreshMinutes(newValue)
-          WidgetCenter.shared.reloadAllTimelines()
-        }
-      }
+      .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
+      .task { autoMinutes = await SharedStore.shared.autoRefreshMinutes() }
+      .onChange(of: autoMinutes) { _, newValue in Task { await SharedStore.shared.setAutoRefreshMinutes(newValue); WidgetCenter.shared.reloadAllTimelines() } }
     }
   }
 }
