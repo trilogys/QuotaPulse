@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.glance.appwidget.updateAll
+import com.trilogys.aiquota.auth.OAuthManager
 import com.trilogys.aiquota.core.AccountRecord
 import com.trilogys.aiquota.core.AccountStore
 import com.trilogys.aiquota.core.Credential
@@ -46,10 +47,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
+                val credentialStore = remember { CredentialStore(this) }
                 AIQuotaScreen(
                     accountStore = remember { AccountStore(this) },
-                    credentialStore = remember { CredentialStore(this) },
-                    usageService = remember { UsageService(CredentialStore(this)) },
+                    credentialStore = credentialStore,
+                    usageService = remember { UsageService(credentialStore) },
+                    oauth = remember { OAuthManager(this) },
                     updateWidget = { AIQuotaWidget().updateAll(this) }
                 )
             }
@@ -62,18 +65,28 @@ private fun AIQuotaScreen(
     accountStore: AccountStore,
     credentialStore: CredentialStore,
     usageService: UsageService,
+    oauth: OAuthManager,
     updateWidget: suspend () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var accounts by remember { mutableStateOf(accountStore.accounts()) }
-    var selectedProvider by remember { mutableStateOf(ProviderId.DEEPSEEK) }
+    var selectedProvider by remember { mutableStateOf(ProviderId.CODEX) }
     var name by remember { mutableStateOf("") }
     var accessToken by remember { mutableStateOf("") }
     var refreshToken by remember { mutableStateOf("") }
     var accountId by remember { mutableStateOf("") }
+    var oauthPaste by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("") }
 
     fun reload() { accounts = accountStore.accounts() }
+    fun saveCredential(provider: ProviderId, credential: Credential) {
+        val account = AccountRecord(provider = provider, name = name.ifBlank { provider.name })
+        accountStore.upsert(account)
+        credentialStore.save(account.id, credential)
+        name = ""
+        reload()
+        scope.launch { updateWidget() }
+    }
 
     Scaffold { padding ->
         LazyColumn(
@@ -82,16 +95,64 @@ private fun AIQuotaScreen(
         ) {
             item {
                 Text("AIQuota", style = MaterialTheme.typography.headlineMedium)
-                Text("iOS + Android · 多账号 · 桌面额度小组件")
+                Text("原生 Android · 多账号 · OAuth · 桌面小组件")
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     ProviderId.entries.forEach { provider ->
-                        TextButton(onClick = { selectedProvider = provider }) {
+                        TextButton(onClick = { selectedProvider = provider; oauthPaste = "" }) {
                             Text(if (selectedProvider == provider) "● ${provider.name}" else provider.name)
                         }
                     }
                 }
-                OutlinedTextField(name, { name = it }, label = { Text("账号名称") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(name, { name = it }, label = { Text("账号名称（可选）") }, modifier = Modifier.fillMaxWidth())
+
+                when (selectedProvider) {
+                    ProviderId.CODEX -> {
+                        Button(onClick = {
+                            status = "请在浏览器登录 Codex；完成后会自动回到本机 localhost。"
+                            scope.launch {
+                                runCatching { oauth.loginCodex() }
+                                    .onSuccess { saveCredential(ProviderId.CODEX, it); status = "Codex OAuth 添加成功" }
+                                    .onFailure { status = "自动回调未完成：${it.message}\n可复制 localhost 完整地址到下方手动完成。" }
+                            }
+                        }) { Text("Codex OAuth 登录") }
+                        OutlinedTextField(oauthPaste, { oauthPaste = it }, label = { Text("localhost callback URL（自动回调失败时）") }, modifier = Modifier.fillMaxWidth())
+                        Button(enabled = oauthPaste.isNotBlank(), onClick = {
+                            scope.launch {
+                                runCatching { oauth.completeCodexManual(oauthPaste) }
+                                    .onSuccess { saveCredential(ProviderId.CODEX, it); oauthPaste = ""; status = "Codex 手动回调完成" }
+                                    .onFailure { status = it.message ?: "Codex callback failed" }
+                            }
+                        }) { Text("完成 Codex 回调") }
+                    }
+                    ProviderId.CLAUDE -> {
+                        Button(onClick = {
+                            oauth.beginClaude()
+                            status = "Claude 授权完成后，把页面显示的 CODE#STATE 粘贴到下方。"
+                        }) { Text("Claude OAuth 登录") }
+                        OutlinedTextField(oauthPaste, { oauthPaste = it }, label = { Text("Claude CODE#STATE") }, modifier = Modifier.fillMaxWidth())
+                        Button(enabled = oauthPaste.isNotBlank(), onClick = {
+                            scope.launch {
+                                runCatching { oauth.completeClaude(oauthPaste) }
+                                    .onSuccess { saveCredential(ProviderId.CLAUDE, it); oauthPaste = ""; status = "Claude OAuth 添加成功" }
+                                    .onFailure { status = it.message ?: "Claude OAuth failed" }
+                            }
+                        }) { Text("完成 Claude 授权") }
+                    }
+                    ProviderId.KIMI -> {
+                        Button(onClick = {
+                            status = "正在启动 Kimi Device OAuth…"
+                            scope.launch {
+                                runCatching { oauth.loginKimi() }
+                                    .onSuccess { saveCredential(ProviderId.KIMI, it); status = "Kimi OAuth 添加成功" }
+                                    .onFailure { status = it.message ?: "Kimi OAuth failed" }
+                            }
+                        }) { Text("Kimi Device OAuth 登录") }
+                    }
+                    ProviderId.DEEPSEEK -> Unit
+                }
+
+                Text("高级/兜底：也可以直接导入已有凭据")
                 OutlinedTextField(accessToken, { accessToken = it }, label = { Text(if (selectedProvider == ProviderId.DEEPSEEK) "API Key" else "Access Token") }, modifier = Modifier.fillMaxWidth())
                 if (selectedProvider != ProviderId.DEEPSEEK) {
                     OutlinedTextField(refreshToken, { refreshToken = it }, label = { Text("Refresh Token（推荐）") }, modifier = Modifier.fillMaxWidth())
@@ -102,13 +163,15 @@ private fun AIQuotaScreen(
                 Button(
                     enabled = accessToken.isNotBlank(),
                     onClick = {
-                        val account = AccountRecord(provider = selectedProvider, name = name.ifBlank { selectedProvider.name })
-                        accountStore.upsert(account)
-                        credentialStore.save(account.id, Credential(accessToken.trim(), refreshToken.trim().ifBlank { null }, accountId = accountId.trim().ifBlank { null }))
-                        accessToken = ""; refreshToken = ""; accountId = ""; name = ""; status = "已添加 ${account.name}"; reload()
-                        scope.launch { updateWidget() }
+                        saveCredential(selectedProvider, Credential(
+                            accessToken = accessToken.trim(),
+                            refreshToken = refreshToken.trim().ifBlank { null },
+                            accountId = accountId.trim().ifBlank { null }
+                        ))
+                        accessToken = ""; refreshToken = ""; accountId = ""; status = "已导入 $selectedProvider 凭据"
                     }
-                ) { Text("添加账号") }
+                ) { Text("导入凭据") }
+
                 if (status.isNotBlank()) Text(status)
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = {
