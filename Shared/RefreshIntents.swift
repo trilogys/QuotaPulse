@@ -2,8 +2,6 @@ import AppIntents
 import Foundation
 import WidgetKit
 
-/// User-initiated refreshes intentionally bypass an active account cooldown once.
-/// Automatic WidgetKit timeline refreshes continue to respect cooldowns.
 struct RefreshAccountIntent: AppIntent {
   static var title: LocalizedStringResource = "刷新 AI 额度"
   static var description = IntentDescription("刷新指定账号的额度，不打开主 App。")
@@ -17,8 +15,7 @@ struct RefreshAccountIntent: AppIntent {
 
   func perform() async throws -> some IntentResult {
     guard let id = UUID(uuidString: accountID) else { return .result() }
-    await SharedStore.shared.clearCooldown(accountID: id)
-    do { _ = try await UsageService.shared.refresh(accountID: id) } catch { }
+    do { _ = try await CooldownAwareRefresh.shared.refresh(accountID: id, manual: true) } catch { }
     WidgetCenter.shared.reloadTimelines(ofKind: AppConfig.widgetKind)
     return .result()
   }
@@ -38,8 +35,7 @@ struct RefreshWidgetSelectionIntent: AppIntent {
   func perform() async throws -> some IntentResult {
     let ids = accountIDs.split(separator: ",").compactMap { UUID(uuidString: String($0)) }
     guard !ids.isEmpty else { return .result() }
-    for id in ids { await SharedStore.shared.clearCooldown(accountID: id) }
-    _ = await UsageService.shared.refresh(accountIDs: ids)
+    _ = await CooldownAwareRefresh.shared.refresh(accountIDs: ids, manual: true)
     WidgetCenter.shared.reloadTimelines(ofKind: AppConfig.widgetKind)
     return .result()
   }
@@ -52,8 +48,7 @@ struct RefreshAllVisibleIntent: AppIntent {
 
   func perform() async throws -> some IntentResult {
     let accounts = await SharedStore.shared.displayAccounts()
-    for account in accounts { await SharedStore.shared.clearCooldown(accountID: account.id) }
-    _ = await UsageService.shared.refresh(accountIDs: accounts.map(\.id))
+    _ = await CooldownAwareRefresh.shared.refresh(accountIDs: accounts.map(\.id), manual: true)
     WidgetCenter.shared.reloadTimelines(ofKind: AppConfig.widgetKind)
     return .result()
   }
