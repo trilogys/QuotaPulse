@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.action.actionRunCallback
+import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.provideContent
@@ -41,7 +43,11 @@ class AIQuotaWidgetReceiver : GlanceAppWidgetReceiver() {
 @Composable
 private fun WidgetContent(rows: List<Pair<AccountRecord, UsageSnapshot?>>) {
     Column(GlanceModifier.fillMaxSize().padding(12.dp)) {
-        Text("AI QUOTA", style = TextStyle(fontWeight = FontWeight.Bold))
+        Row {
+            Text("AI QUOTA", style = TextStyle(fontWeight = FontWeight.Bold))
+            Spacer(GlanceModifier.defaultWeight())
+            Text("↻", modifier = GlanceModifier.clickable(actionRunCallback<RefreshWidgetAction>()))
+        }
         Spacer(GlanceModifier.width(4.dp))
         if (rows.isEmpty()) {
             Text("打开 AIQuota 添加账号")
