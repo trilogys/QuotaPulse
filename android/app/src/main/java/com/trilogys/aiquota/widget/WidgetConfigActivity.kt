@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -59,7 +59,7 @@ class WidgetConfigActivity : ComponentActivity() {
                     Text("每个小组件都可以独立选择显示内容。")
 
                     LazyColumn(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         item {
