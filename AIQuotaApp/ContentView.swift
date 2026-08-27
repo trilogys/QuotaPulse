@@ -24,6 +24,7 @@ struct ContentView: View {
               AccountRow(
                 account: account,
                 snapshot: model.snapshots[account.id],
+                recommended: recommendedAccountIDs.contains(account.id),
                 onRefresh: { await model.refresh(account) },
                 onToggle: { enabled in await model.setEnabled(account, enabled: enabled) }
               )
@@ -40,6 +41,20 @@ struct ContentView: View {
                   Label("重命名", systemImage: "pencil")
                 }
                 .tint(.blue)
+              }
+              .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                Button {
+                  Task { await model.move(account, offset: -1) }
+                } label: {
+                  Label("上移", systemImage: "arrow.up")
+                }
+                .tint(.indigo)
+                Button {
+                  Task { await model.move(account, offset: 1) }
+                } label: {
+                  Label("下移", systemImage: "arrow.down")
+                }
+                .tint(.teal)
               }
             }
           }
@@ -140,6 +155,26 @@ struct ContentView: View {
     }
   }
 
+  private var recommendedAccountIDs: Set<UUID> {
+    Set(ProviderID.allCases.compactMap { provider in
+      model.accounts
+        .filter { $0.isEnabled && $0.provider == provider }
+        .compactMap { account -> (UUID, Double)? in
+          guard let snapshot = model.snapshots[account.id], !snapshot.stale else { return nil }
+          let score: Double
+          if let balance = snapshot.balance {
+            score = balance.total
+          } else if let minimum = snapshot.windows.map(\.remainingPercent).min() {
+            score = minimum
+          } else {
+            return nil
+          }
+          return (account.id, score)
+        }
+        .max(by: { $0.1 < $1.1 })?.0
+    })
+  }
+
   private func loginOAuth(_ provider: ProviderID) {
     Task { @MainActor in
       guard let presenter = UIApplication.shared.activeTopViewController() else {
@@ -159,6 +194,7 @@ struct ContentView: View {
 private struct AccountRow: View {
   let account: AccountRecord
   let snapshot: UsageSnapshot?
+  let recommended: Bool
   let onRefresh: () async -> Void
   let onToggle: (Bool) async -> Void
 
@@ -168,8 +204,16 @@ private struct AccountRow: View {
     VStack(alignment: .leading, spacing: 8) {
       HStack {
         VStack(alignment: .leading, spacing: 2) {
-          Text(account.label)
-            .font(.headline)
+          HStack(spacing: 5) {
+            Text(account.label)
+              .font(.headline)
+            if recommended {
+              Label("推荐", systemImage: "star.fill")
+                .labelStyle(.iconOnly)
+                .foregroundStyle(.yellow)
+                .accessibilityLabel("推荐账号")
+            }
+          }
           Text(account.provider.title)
             .font(.caption)
             .foregroundStyle(.secondary)
