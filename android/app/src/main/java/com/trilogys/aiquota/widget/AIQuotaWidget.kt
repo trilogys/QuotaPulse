@@ -6,6 +6,7 @@ import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.action.clickable
+import androidx.glance.appwidget.AppWidgetId
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.action.actionRunCallback
@@ -30,13 +31,29 @@ import kotlin.math.roundToInt
 class AIQuotaWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val store = AccountStore(context)
-        val rows = store.accounts().filter { it.enabled }.take(6).map { it to store.snapshot(it.id) }
+        val configStore = WidgetConfigStore(context)
+        val appWidgetId = (id as? AppWidgetId)?.appWidgetId
+        val config = appWidgetId?.let(configStore::get) ?: WidgetConfigStore.Config()
+        val accounts = store.accounts().filter { it.enabled }.filter { account ->
+            when (config.mode) {
+                WidgetConfigStore.Mode.ALL -> true
+                WidgetConfigStore.Mode.PROVIDER -> account.provider == config.provider
+                WidgetConfigStore.Mode.ACCOUNT -> account.id == config.accountId
+            }
+        }.take(6)
+        val rows = accounts.map { it to store.snapshot(it.id) }
         provideContent { WidgetContent(rows) }
     }
 }
 
 class AIQuotaWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = AIQuotaWidget()
+
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        super.onDeleted(context, appWidgetIds)
+        val store = WidgetConfigStore(context)
+        appWidgetIds.forEach(store::delete)
+    }
 }
 
 @Composable
@@ -48,7 +65,7 @@ private fun WidgetContent(rows: List<Pair<AccountRecord, UsageSnapshot?>>) {
         }
         Spacer(GlanceModifier.width(4.dp))
         if (rows.isEmpty()) {
-            Text("打开 AIQuota 添加账号")
+            Text("暂无匹配账号，长按小组件重新配置")
         } else {
             rows.forEach { (account, snapshot) ->
                 Row {
