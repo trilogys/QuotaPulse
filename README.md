@@ -1,8 +1,8 @@
-# AIQuota Native v0.10.0
+# AIQuota Native v0.11.0
 
 AI 服务额度监控：**原生 iOS + 原生 Android + 桌面小组件 + 多账号 + 本机凭据保存 + 后台刷新**。
 
-目标是让手机自己完成日常额度查询与 Widget 更新；电脑最多只作为首次 credentials 导入的可选方式，不作为持续运行的中转设备。
+目标是让手机自己完成日常额度查询与 Widget 更新；电脑最多只作为首次 credentials 导入或签名材料准备的可选方式，不作为持续运行的中转设备。
 
 ## Provider
 
@@ -35,22 +35,22 @@ AIQuota 不直接复制某一个项目的 UI，而是组合三个方向：
 - 多账号 UUID 隔离
 - 账号重命名、启用/隐藏、排序
 - 每个 Provider 自动标记推荐账号
-- WidgetKit 桌面 Widget
+- 凭据健康状态：正常 / 即将续期 / 可续期 / 需重登 / 缓存
+- Codex / Claude / Kimi 原账号一键重新认证，保持 UUID 与 Widget 绑定不变
+- 额度 Reset 倒计时
+- WidgetKit Small / Medium / Large 自适应信息密度
 - Widget 内 `↻` 原地刷新，不打开主 App
 - Widget timeline 自动刷新
 - stale cache：网络失败保留上次成功数据
 - 80% / 90% / 约 100% 已用额度分级通知，按账号/额度窗口去重
-- 主 App 首次运行请求通知权限
-- Shared `UsageService` 统一执行阈值判断，因此主 App 与 Widget/App Intent 刷新共用同一规则
+- 简体中文 / English 本地化；可使用 iOS 每 App 语言设置切换，Widget 同步语言
 - GitHub Actions 构建 unsigned / re-sign / P12 signed IPA
 
 Codex 使用 browser OAuth + PKCE + iPhone 本机 localhost callback；日常刷新不依赖电脑或中转服务器。
 
-最新 iOS Simulator CI 已验证通知权限、Shared 通知器、UsageService 接入与账号排序均可编译通过。
+### iOS IPA / 重签
 
-### iOS 安装/签名
-
-`Actions → ipa` 支持两类产物：
+`Actions → ipa` 支持：
 
 ```text
 AIQuota-iOS-resign
@@ -63,31 +63,32 @@ AIQuota-signed-release-testing / debugging
 └─ AIQuota-signed.ipa
 ```
 
-`AIQuota-resign.ipa` 是标准 IPA，可作为全能签、ESign、爱思助手等第三方签名/安装工具的输入。由于 AIQuota 包含 Widget Extension，签名工具必须同时正确签名主 App 与 `AIQuotaWidget.appex`，并处理匹配的 App Group / Keychain entitlements。
+`AIQuota-resign.ipa` 是标准 IPA，可作为全能签、ESign、爱思助手等第三方签名/安装工具的输入。包内真实包含：
 
-P12 模式需要：
+```text
+Payload/AIQuota.app/PlugIns/AIQuotaWidget.appex
+```
 
-- `.p12` + 密码
-- 主 App `.mobileprovision`
-- Widget `.mobileprovision`
+因此重签工具需要同时正确签名主 App 与 Widget Extension，并处理匹配的 App Group / Keychain entitlements。当前 GitHub Actions 已真实验证 unsigned/re-sign IPA 构建、Widget 嵌入和 artifact 上传成功。
 
-GitHub Actions 会自动解析 Team / Bundle ID / App Group、验证 profile 兼容性并生成签名 IPA。详见 `IPA.md` / `SIGNING.md`。
+P12 模式需要：`.p12` + 密码、主 App `.mobileprovision`、Widget `.mobileprovision`。GitHub Actions 会解析 Team / Bundle ID / App Group、验证 profile 兼容性并生成签名 IPA。详见 `IPA.md` / `SIGNING.md`。
 
 ## Android
 
 技术栈：Kotlin + Jetpack Compose + Jetpack Glance + WorkManager + Android Keystore/EncryptedSharedPreferences。
 
-v0.10.0 已形成可安装闭环：
+当前支持：
 
 - Codex browser OAuth + PKCE
-- localhost callback；1455 不可用时尝试备用端口
-- Codex 自动回调失败时支持粘贴完整 localhost callback URL
+- localhost callback；自动回调失败时可粘贴完整 callback URL
 - Claude OAuth，授权后粘贴 `CODE#STATE`
 - Kimi Device OAuth，浏览器确认 + App 自动轮询 token
 - Codex / Claude / Kimi refresh token 自动续期
-- Kimi device headers 持久化并用于 refresh / usage
+- Kimi device headers 持久化
 - DeepSeek API Key 查询余额
-- 多账号 Account UUID 隔离
+- 多账号 UUID 隔离
+- 凭据健康状态与原账号重新认证覆盖模式
+- Reset 倒计时
 - EncryptedSharedPreferences + Android Keystore 保存敏感凭据
 - 本地 usage snapshot cache；失败时保留旧数据并标记 stale
 - WorkManager 每 15 分钟后台刷新
@@ -95,20 +96,12 @@ v0.10.0 已形成可安装闭环：
 - Widget 独立配置：全部账号 / 单 Provider / 单账号
 - Widget 独立布局：紧凑 / 详细
 - Widget 独立显示条数：1 / 2 / 4 / 6 / 8
-- 每个 Widget 配置按 `appWidgetId` 独立保存
-- Widget `↻` 不打开 App；总览刷新全部、Provider Widget 只刷新该 Provider、单账号 Widget 只刷新该账号
-- 账号显示/隐藏、上下排序
-- 每个 Provider 推荐账号
-- 80% / 90% / 约 100% 已用额度分级通知，并按账号/窗口去重
-- Android 13+ 请求通知权限
-- GitHub Actions 自动构建 debug APK
-- 可选 GitHub Actions 正式签名 release APK
-
-### 已验证 Android 构建
-
-GitHub Actions Android run `33064011400` 已完整通过：`assembleDebug` 成功，APK artifact 上传成功。
-
-Artifact：`AIQuota-Android-debug`，其中包含 `app-debug.apk`。
+- Widget 根据实际宽高自动减少行数；空间不足时自动降级为紧凑模式
+- Widget `↻` 定向刷新：总览 / Provider / 单账号按配置缩小请求范围
+- 账号显示/隐藏、上下排序、推荐账号
+- 80% / 90% / 约 100% 已用额度分级通知
+- 简体中文 / English 资源化；Android 13+ 支持系统“应用语言”单独切换
+- GitHub Actions 自动构建 debug APK；配置 Secrets 后额外生成签名 release APK
 
 ## 认证策略
 
@@ -134,7 +127,7 @@ DeepSeek
   API Key
 ```
 
-所有账号的 access token / refresh token / API Key 独立保存；刷新一个账号不会覆盖同 Provider 的其它账号。
+所有账号的 access token / refresh token / API Key 独立保存；重新认证会覆盖原账号凭据而保留 Account UUID，因此已配置 Widget 不会失去绑定。
 
 ## Widget 刷新
 
@@ -151,34 +144,32 @@ DeepSeek
 - Widget `↻` 使用 OneTimeWorkRequest
 - Worker 根据当前 Widget 配置缩小请求范围
 - 完成后调用 Glance `updateAll()` 更新桌面 Widget
-- 每个 Widget 可以独立配置筛选范围、紧凑/详细模式与显示条数
+- Widget 使用 `LocalSize` 根据实际尺寸调整行数/信息密度
 
 ## 推荐账号规则
 
-对于 Codex / Claude / Kimi，一个账号可能同时有 5h、周等多个窗口。AIQuota 使用：
+对于 Codex / Claude / Kimi：
 
 ```text
 账号评分 = min(该账号所有额度窗口剩余百分比)
 推荐账号 = 同 Provider 中评分最高的账号
 ```
 
-因此不会出现“5h 剩很多，但周额度已经快用完却仍然推荐”的情况。
-
-DeepSeek 等余额型 Provider 则按可用余额比较。
+DeepSeek 等余额型 Provider 按可用余额比较。
 
 ## 额度提醒
 
-iOS 与 Android 当前统一三级：
+双端统一三级：
 
 - 已用约 80%：剩余 ≤ 20%
 - 已用约 90%：剩余 ≤ 10%
 - 已用约 100%：剩余 ≤ 0.5%
 
-同一账号、同一额度窗口、同一级别不会被后台刷新反复通知；额度恢复到安全区后会重置提醒状态。
+同一账号、同一额度窗口、同一级别不会被后台刷新反复通知；额度恢复到安全区后重置提醒状态。
 
 ## Android Release APK
 
-默认 workflow 始终生成 debug APK。若希望完全通过 GitHub Actions 生成正式签名 APK，在仓库 `Settings → Secrets and variables → Actions` 配置：
+默认 workflow 生成 debug APK。若希望 GitHub Actions 同时生成正式签名 APK，在 `Settings → Secrets and variables → Actions` 配置：
 
 ```text
 ANDROID_KEYSTORE_BASE64
@@ -187,13 +178,7 @@ ANDROID_KEY_ALIAS
 ANDROID_KEY_PASSWORD
 ```
 
-`ANDROID_KEYSTORE_BASE64` 是 Android keystore 文件的 Base64 内容。配置完成后运行 `Actions → Android`，会额外生成：
-
-```text
-AIQuota-Android-release/app-release.apk
-```
-
-签名文件和密码只进入 GitHub Actions Secrets，不写入仓库源码。
+然后运行 `Actions → Android`，额外生成 `AIQuota-Android-release/app-release.apk`。
 
 ## 安全
 
@@ -209,32 +194,22 @@ AIQuota-Android-release/app-release.apk
 ```text
 AIQuotaApp/                       iOS 主 App / OAuth / 多账号
 AIQuotaWidget/                    iOS WidgetKit Interactive Widget
-Shared/                           iOS Provider / Keychain / App Intents / Alerts
+Shared/                           iOS Provider / Keychain / App Intents / Alerts / Localizations
 android/
   app/src/main/java/.../auth/     Android OAuth / PKCE / Device Flow
   app/src/main/java/.../core/     Account / Credential / Provider / Usage
   app/src/main/java/.../widget/   Glance Widget / config / refresh action
   app/src/main/java/.../work/     WorkManager / quota alerts
+  app/src/main/res/values*        Android English / Simplified Chinese resources
 .github/workflows/ipa.yml         iOS unsigned/re-sign/P12 signed IPA
 .github/workflows/android.yml     Android debug/release APK
 Scripts/                          iOS 构建/签名/结构验证脚本
 ```
 
-## 构建
+## Next
 
-iOS：`Actions → ipa → Run workflow`，支持第三方重签 IPA 和 p12 + mobileprovision signed IPA，详见 `IPA.md` / `SIGNING.md`。
-
-Android：`Actions → Android → Run workflow`。默认下载 `AIQuota-Android-debug`；配置签名 Secrets 后还会生成 `AIQuota-Android-release`。
-
-Android 当前工具链：API 37 / AGP 9.3 / Gradle 9.5 / Compose 2026.08 / Glance 1.2。
-
-## 下一阶段
-
-1. 两端完整中英文本地化
-2. Provider fixture / contract tests，降低上游 API 格式变化风险
-3. Gemini / OpenRouter / Cursor / Android Copilot 等 Provider 扩展
-4. Android AAB / GitHub Release 自动发布
-5. OAuth 登录状态诊断、凭据健康检查与一键重新认证
-6. Widget 自适应尺寸与更完整的视觉状态
-
-项目原则：**手机自己查询额度；电脑最多只作为首次 credentials 导入的可选方式，日常刷新不依赖 Mac、Windows、Linux 或中转服务器。**
+- Provider fixture / contract tests
+- Gemini / OpenRouter / Cursor 等 Provider
+- iOS Widget 进一步支持单 Provider / 单账号配置
+- Provider/API 健康诊断与错误分类
+- Release automation / changelog
