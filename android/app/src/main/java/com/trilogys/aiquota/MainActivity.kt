@@ -88,6 +88,8 @@ private fun AIQuotaScreen(
         scope.launch { updateWidget() }
     }
 
+    val recommended = recommendedAccountIds(accounts, accountStore)
+
     Scaffold { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
@@ -193,7 +195,9 @@ private fun AIQuotaScreen(
                 val snapshot = accountStore.snapshot(account.id)
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp)) {
-                        Text("${account.provider.name} · ${account.name}", style = MaterialTheme.typography.titleMedium)
+                        val recommendedMark = if (recommended.contains(account.id)) " ★ 推荐" else ""
+                        val hiddenMark = if (!account.enabled) " · 已隐藏" else ""
+                        Text("${account.provider.name} · ${account.name}$recommendedMark$hiddenMark", style = MaterialTheme.typography.titleMedium)
                         val summary = snapshot?.balance?.let { "${it.symbol}${"%.2f".format(it.total)}" }
                             ?: snapshot?.windows?.joinToString("  ") { "${it.label} ${it.remainingPercent.roundToInt()}%" }
                             ?: "尚未刷新"
@@ -208,9 +212,18 @@ private fun AIQuotaScreen(
                                             .onSuccess(accountStore::saveSnapshot)
                                             .onFailure { accountStore.markStale(account.id, it.message ?: "Refresh failed") }
                                     }
-                                    updateWidget(); status = "完成"
+                                    updateWidget(); status = "完成"; reload()
                                 }
                             }) { Text("刷新") }
+                            TextButton(onClick = {
+                                accountStore.setEnabled(account.id, !account.enabled); reload(); scope.launch { updateWidget() }
+                            }) { Text(if (account.enabled) "隐藏" else "显示") }
+                            TextButton(onClick = {
+                                accountStore.move(account.id, -1); reload(); scope.launch { updateWidget() }
+                            }) { Text("↑") }
+                            TextButton(onClick = {
+                                accountStore.move(account.id, 1); reload(); scope.launch { updateWidget() }
+                            }) { Text("↓") }
                             TextButton(onClick = {
                                 accountStore.delete(account.id); credentialStore.delete(account.id); reload(); scope.launch { updateWidget() }
                             }) { Text("删除") }
@@ -221,3 +234,16 @@ private fun AIQuotaScreen(
         }
     }
 }
+
+private fun recommendedAccountIds(accounts: List<AccountRecord>, store: AccountStore): Set<String> =
+    ProviderId.entries.mapNotNull { provider ->
+        accounts.asSequence()
+            .filter { it.enabled && it.provider == provider }
+            .mapNotNull { account ->
+                val snapshot = store.snapshot(account.id)?.takeUnless { it.stale } ?: return@mapNotNull null
+                val score = snapshot.balance?.total ?: snapshot.windows.minOfOrNull { it.remainingPercent } ?: return@mapNotNull null
+                account.id to score
+            }
+            .maxByOrNull { it.second }
+            ?.first
+    }.toSet()
