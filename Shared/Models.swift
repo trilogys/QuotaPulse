@@ -123,6 +123,28 @@ struct BalanceSnapshot: Codable, Hashable, Sendable {
   var available: Bool
 }
 
+enum ProviderErrorKind: String, Codable, Hashable, Sendable {
+  case authentication
+  case rateLimited
+  case providerUnavailable
+  case network
+  case invalidResponse
+  case configuration
+  case unknown
+
+  var shortLabel: String {
+    switch self {
+    case .authentication: "登录失效"
+    case .rateLimited: "限流"
+    case .providerUnavailable: "服务异常"
+    case .network: "网络异常"
+    case .invalidResponse: "数据异常"
+    case .configuration: "配置异常"
+    case .unknown: "刷新失败"
+    }
+  }
+}
+
 struct UsageSnapshot: Codable, Hashable, Sendable, Identifiable {
   var id: UUID { accountID }
   var accountID: UUID
@@ -133,6 +155,7 @@ struct UsageSnapshot: Codable, Hashable, Sendable, Identifiable {
   var balance: BalanceSnapshot?
   var plan: String?
   var errorMessage: String?
+  var errorKind: ProviderErrorKind?
   var stale: Bool
 
   init(
@@ -144,6 +167,7 @@ struct UsageSnapshot: Codable, Hashable, Sendable, Identifiable {
     balance: BalanceSnapshot? = nil,
     plan: String? = nil,
     errorMessage: String? = nil,
+    errorKind: ProviderErrorKind? = nil,
     stale: Bool = false
   ) {
     self.accountID = accountID
@@ -154,6 +178,7 @@ struct UsageSnapshot: Codable, Hashable, Sendable, Identifiable {
     self.balance = balance
     self.plan = plan
     self.errorMessage = errorMessage
+    self.errorKind = errorKind
     self.stale = stale
   }
 }
