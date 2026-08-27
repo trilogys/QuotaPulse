@@ -92,5 +92,8 @@ IPA="$(find build/export -maxdepth 1 -name '*.ipa' -print -quit)"
 [[ -f "$IPA" ]] || { echo "Signed IPA not produced." >&2; exit 1; }
 ./Scripts/verify_ipa_structure.sh "$IPA" signed
 cp "$IPA" build/export/AIQuota-signed.ipa
-shasum -a 256 build/export/AIQuota-signed.ipa > build/export/AIQuota-signed.ipa.sha256
+(
+  cd build/export
+  shasum -a 256 AIQuota-signed.ipa > AIQuota-signed.ipa.sha256
+)
 printf '\nReady: %s\n' "$ROOT/build/export/AIQuota-signed.ipa"

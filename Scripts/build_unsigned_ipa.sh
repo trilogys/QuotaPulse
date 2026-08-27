@@ -97,7 +97,7 @@ cp "$IPA" "$RESIGN_IPA"
 
 cat > "$ROOT/$OUT_DIR/AIQuota-unsigned-signing-info.txt" <<INFO
 AIQuota Native unsigned / re-sign IPA
-Version: 0.10.0
+Minimum iOS: 16.0
 Main bundle ID: $APP_BUNDLE
 Widget bundle ID: $WIDGET_BUNDLE
 App Group expected at runtime: $APP_GROUP
@@ -122,6 +122,9 @@ INFO
 
 "$ROOT/Scripts/verify_ipa_structure.sh" "$IPA" unsigned
 "$ROOT/Scripts/verify_ipa_structure.sh" "$RESIGN_IPA" unsigned
-shasum -a 256 "$IPA" > "$IPA.sha256"
-shasum -a 256 "$RESIGN_IPA" > "$RESIGN_IPA.sha256"
+(
+  cd "$ROOT/$OUT_DIR"
+  shasum -a 256 AIQuota-unsigned.ipa > AIQuota-unsigned.ipa.sha256
+  shasum -a 256 AIQuota-resign.ipa > AIQuota-resign.ipa.sha256
+)
 printf '\nUnsigned IPA: %s\nRe-sign IPA: %s\n' "$IPA" "$RESIGN_IPA"

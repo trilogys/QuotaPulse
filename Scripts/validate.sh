@@ -12,23 +12,25 @@ for p in [Path('AIQuotaApp/AIQuotaApp.entitlements'), Path('AIQuotaWidget/AIQuot
     assert 'keychain-access-groups' in d, p
 print('entitlements: ok')
 
-s=Path('Shared/AppConfig.swift').read_text()
-assert '0.8.0' in s
+s=Path('Shared/AppConfig.swift').read_text(encoding='utf-8')
+assert '0.11.0' in s
 assert 'AIQuotaKeychainSuffix' in s
-ks=Path('Shared/KeychainStore.swift').read_text()
+assert 'AIQuotaSingleProfile' in s
+ks=Path('Shared/KeychainStore.swift').read_text(encoding='utf-8')
 assert 'discoverDefaultAccessGroup' in ks
 assert 'kSecAttrAccessGroup' in ks
-print('v0.8 runtime keychain resolution: ok')
+assert 'credentialQuery' in ks and 'AppConfig.isAppOnlyBuild' in ks
+print('runtime keychain resolution: ok')
 
-models=Path('Shared/Models.swift').read_text()
-health=Path('Shared/ProviderHealth.swift').read_text()
-store=Path('Shared/SharedStore.swift').read_text()
+models=Path('Shared/Models.swift').read_text(encoding='utf-8')
+health=Path('Shared/ProviderHealth.swift').read_text(encoding='utf-8')
+store=Path('Shared/SharedStore.swift').read_text(encoding='utf-8')
 for case in ['authentication', 'rateLimited', 'providerUnavailable', 'network', 'invalidResponse', 'configuration', 'unknown']:
     assert f'case {case}' in models, case
 assert 'effectiveErrorKind' in health
 assert 'healthState' in health
 assert 'HTTP 401' not in health  # classifier matches status fragments, not provider-specific hardcoding
-assert 'kind: ProviderErrorKind?' in store
+assert 'kind:ProviderErrorKind?' in store or 'kind: ProviderErrorKind?' in store
 print('provider health contracts: ok')
 PY
 
@@ -42,7 +44,25 @@ grep -q '#include? "SigningConfig.xcconfig"' Config.xcconfig
 grep -q 'build_type:' .github/workflows/ipa.yml
 grep -q 'AIQuota-unsigned.ipa' .github/workflows/ipa.yml
 grep -q 'AIQuota-signed.ipa' .github/workflows/ipa.yml
+grep -q 'build_app_only_ipa.sh' .github/workflows/ipa.yml
+grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 16.0' Config.xcconfig
+grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 16.0' Config.single-profile.xcconfig
+grep -q 'AIQUOTA_RELEASE_STORE_FILE: ../release.keystore' .github/workflows/android.yml
 echo "signing / IPA configuration: ok"
+
+python3 - <<'PY'
+from pathlib import Path
+widget=Path('AIQuotaWidget/AIQuotaWidget.swift').read_text(encoding='utf-8')
+content=Path('AIQuotaApp/ContentView.swift').read_text(encoding='utf-8')
+single=Path('project.single-profile.yml').read_text(encoding='utf-8')
+assert 'StaticConfiguration' in widget
+assert 'AppIntentConfiguration' in widget
+assert '#available(iOS 17.0, *)' in widget
+assert 'ContentUnavailableView' not in content
+assert 'RefreshIntents.swift' in single and 'WidgetConfigurationIntent.swift' in single
+assert Path('Scripts/build_app_only_ipa.sh').exists()
+print('iOS 16 / app-only compatibility contracts: ok')
+PY
 
 python3 - <<'PY'
 from pathlib import Path
@@ -52,8 +72,9 @@ except Exception:
     print('yaml parse: skipped (PyYAML unavailable)')
 else:
     for p in Path('.github/workflows').glob('*.yml'):
-        yaml.safe_load(p.read_text())
-    yaml.safe_load(Path('project.yml').read_text())
+        yaml.safe_load(p.read_text(encoding='utf-8'))
+    yaml.safe_load(Path('project.yml').read_text(encoding='utf-8'))
+    yaml.safe_load(Path('project.single-profile.yml').read_text(encoding='utf-8'))
     print('yaml parse: ok')
 PY
 
