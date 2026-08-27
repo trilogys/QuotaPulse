@@ -1,0 +1,37 @@
+<resources>
+    <string name="app_name">AIQuota</string>
+    <string name="app_subtitle">原生 Android · 多账号 · OAuth · 桌面小组件</string>
+    <string name="accounts">账号</string>
+    <string name="account_name_optional">账号名称（可选）</string>
+    <string name="refresh_all">刷新全部</string>
+    <string name="refresh">刷新</string>
+    <string name="hide">隐藏</string>
+    <string name="show">显示</string>
+    <string name="delete">删除</string>
+    <string name="reauthenticate">重新认证</string>
+    <string name="recommended">推荐</string>
+    <string name="hidden">已隐藏</string>
+    <string name="credential_status">凭据：%1$s</string>
+    <string name="credential_healthy">正常</string>
+    <string name="credential_saved">已保存</string>
+    <string name="credential_cached">缓存中</string>
+    <string name="credential_refreshable">可续期</string>
+    <string name="credential_renew_soon">即将续期</string>
+    <string name="credential_sign_in_again">需重登</string>
+    <string name="no_data">尚未刷新</string>
+    <string name="balance">余额</string>
+    <string name="updated">更新 %1$s</string>
+    <string name="widget_empty">暂无匹配账号，长按小组件重新配置</string>
+    <string name="widget_title">AI 额度</string>
+    <string name="widget_cached">缓存</string>
+    <string name="reset_in">重置 %1$s</string>
+    <string name="oauth_fallback">高级/兜底：也可以直接导入已有凭据</string>
+    <string name="access_token">Access Token</string>
+    <string name="api_key">API Key</string>
+    <string name="refresh_token">Refresh Token（推荐）</string>
+    <string name="account_id_optional">ChatGPT Account ID（可选）</string>
+    <string name="import_credentials">导入凭据</string>
+    <string name="update_credentials">更新凭据</string>
+    <string name="cancel_reauth">取消重新认证</string>
+    <string name="reauth_mode">重新认证模式：成功后覆盖原账号凭据</string>
+</resources>
