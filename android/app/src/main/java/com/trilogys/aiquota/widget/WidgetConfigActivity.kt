@@ -26,8 +26,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.glance.appwidget.updateAll
+import com.trilogys.aiquota.R
 import com.trilogys.aiquota.core.AccountStore
 import com.trilogys.aiquota.core.ProviderId
 import kotlinx.coroutines.launch
@@ -56,17 +58,17 @@ class WidgetConfigActivity : ComponentActivity() {
                 val accounts = remember { accountStore.accounts().filter { it.enabled } }
 
                 Column(Modifier.fillMaxSize().padding(16.dp)) {
-                    Text("配置 AIQuota 小组件", style = MaterialTheme.typography.headlineSmall)
-                    Text("每个小组件都可以独立选择内容、布局和显示条数。")
+                    Text(stringResource(R.string.widget_config_title), style = MaterialTheme.typography.headlineSmall)
+                    Text(stringResource(R.string.widget_config_subtitle))
 
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth().heightIn(max = 620.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        item { Text("显示内容", style = MaterialTheme.typography.titleMedium) }
+                        item { Text(stringResource(R.string.widget_content), style = MaterialTheme.typography.titleMedium) }
                         item {
                             ChoiceCard(
-                                title = "全部账号",
+                                title = stringResource(R.string.widget_all_accounts),
                                 selected = config.mode == WidgetConfigStore.Mode.ALL,
                                 onClick = {
                                     config = config.copy(
@@ -80,7 +82,7 @@ class WidgetConfigActivity : ComponentActivity() {
                         ProviderId.entries.forEach { provider ->
                             item {
                                 ChoiceCard(
-                                    title = "只显示 ${provider.name}",
+                                    title = stringResource(R.string.widget_provider_only, provider.name),
                                     selected = config.mode == WidgetConfigStore.Mode.PROVIDER && config.provider == provider,
                                     onClick = {
                                         config = config.copy(
@@ -93,7 +95,7 @@ class WidgetConfigActivity : ComponentActivity() {
                             }
                         }
                         if (accounts.isNotEmpty()) {
-                            item { Text("单账号", style = MaterialTheme.typography.titleMedium) }
+                            item { Text(stringResource(R.string.widget_single_account), style = MaterialTheme.typography.titleMedium) }
                             items(accounts, key = { it.id }) { account ->
                                 ChoiceCard(
                                     title = "${account.provider.name} · ${account.name}",
@@ -109,19 +111,21 @@ class WidgetConfigActivity : ComponentActivity() {
                             }
                         }
 
-                        item { Text("布局", style = MaterialTheme.typography.titleMedium) }
+                        item { Text(stringResource(R.string.widget_layout), style = MaterialTheme.typography.titleMedium) }
                         item {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                val compact = stringResource(R.string.widget_compact)
+                                val detailed = stringResource(R.string.widget_detailed)
                                 TextButton(onClick = { config = config.copy(layout = WidgetConfigStore.Layout.COMPACT) }) {
-                                    Text(if (config.layout == WidgetConfigStore.Layout.COMPACT) "● 紧凑" else "○ 紧凑")
+                                    Text(if (config.layout == WidgetConfigStore.Layout.COMPACT) "● $compact" else "○ $compact")
                                 }
                                 TextButton(onClick = { config = config.copy(layout = WidgetConfigStore.Layout.DETAILED) }) {
-                                    Text(if (config.layout == WidgetConfigStore.Layout.DETAILED) "● 详细" else "○ 详细")
+                                    Text(if (config.layout == WidgetConfigStore.Layout.DETAILED) "● $detailed" else "○ $detailed")
                                 }
                             }
                         }
 
-                        item { Text("显示条数", style = MaterialTheme.typography.titleMedium) }
+                        item { Text(stringResource(R.string.widget_rows), style = MaterialTheme.typography.titleMedium) }
                         item {
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 listOf(1, 2, 4, 6, 8).forEach { count ->
@@ -142,7 +146,7 @@ class WidgetConfigActivity : ComponentActivity() {
                             scope.launch { AIQuotaWidget().updateAll(this@WidgetConfigActivity) }
                             finish()
                         }
-                    ) { Text("保存") }
+                    ) { Text(stringResource(R.string.save)) }
                 }
             }
         }
