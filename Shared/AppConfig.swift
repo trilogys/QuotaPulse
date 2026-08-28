@@ -12,6 +12,9 @@ enum AppConfig {
   static var isAppOnlyBuild: Bool {
     Bundle.main.object(forInfoDictionaryKey: "AIQuotaSingleProfile") as? Bool ?? false
   }
+  static var isWidgetExtension: Bool {
+    Bundle.main.bundleURL.pathExtension == "appex"
+  }
   static let widgetKind = "AIQuotaWidget"
   static let keychainService = "AIQuota.Credentials"
   static let keychainSuffixInfoKey = "AIQuotaKeychainSuffix"

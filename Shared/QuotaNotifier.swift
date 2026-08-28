@@ -8,7 +8,13 @@ actor QuotaNotifier {
   private let center = UNUserNotificationCenter.current()
 
   init() {
-    if let appGroup = AppConfig.appGroup {
+    let canShareCredentials: Bool
+    if case .available = KeychainStore.shared.sharedAccessStatus() {
+      canShareCredentials = true
+    } else {
+      canShareCredentials = false
+    }
+    if let appGroup = AppConfig.appGroup, AppConfig.isWidgetExtension || canShareCredentials {
       defaults = UserDefaults(suiteName: appGroup) ?? .standard
     } else {
       defaults = .standard

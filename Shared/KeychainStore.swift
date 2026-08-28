@@ -45,17 +45,19 @@ struct KeychainStore: Sendable {
     guard let suffix = Bundle.main.object(forInfoDictionaryKey: AppConfig.keychainSuffixInfoKey) as? String, !suffix.isEmpty else { return .unavailable(reason: "缺少 Keychain 共享配置") }
     guard let group = accessGroup, !group.isEmpty else { return .unavailable(reason: "无法解析共享 Keychain；请检查 IPA 重签权限") }
     guard group == suffix || group.hasSuffix(".\(suffix)") else { return .unavailable(reason: "Keychain Access Group 与应用配置不匹配") }
+    guard canAccess(group: group) else { return .unavailable(reason: "当前签名未授权共享 Keychain；主 App 将使用本地凭据") }
     return .available(accessGroup: group)
   }
 
   private func credentialQuery(_ base: [String: Any]) throws -> [String: Any] {
     if AppConfig.isAppOnlyBuild { return base }
-    guard case .available(let group) = sharedAccessStatus() else {
-      throw KeychainError.missingAccessGroup
+    if case .available(let group) = sharedAccessStatus() {
+      var query = base
+      query[kSecAttrAccessGroup as String] = group
+      return query
     }
-    var query = base
-    query[kSecAttrAccessGroup as String] = group
-    return query
+    if !AppConfig.isWidgetExtension { return base }
+    throw KeychainError.missingAccessGroup
   }
 
   private func discoverDefaultAccessGroup() -> String? {
@@ -66,6 +68,23 @@ struct KeychainStore: Sendable {
     let addStatus=SecItemAdd(add as CFDictionary,nil);guard addStatus==errSecSuccess else{return nil};defer{SecItemDelete(base as CFDictionary)}
     var read=base;read[kSecReturnAttributes as String]=true;read[kSecMatchLimit as String]=kSecMatchLimitOne;var result:CFTypeRef?
     guard SecItemCopyMatching(read as CFDictionary,&result)==errSecSuccess,let attrs=result as? [String:Any],let group=attrs[kSecAttrAccessGroup as String] as? String,!group.isEmpty else{return nil};return group
+  }
+
+  private func canAccess(group: String) -> Bool {
+    let account = "probe.\(UUID().uuidString)"
+    let base: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: "\(AppConfig.keychainService).SharedGroupProbe",
+      kSecAttrAccount as String: account,
+      kSecAttrAccessGroup as String: group,
+    ]
+    SecItemDelete(base as CFDictionary)
+    var add = base
+    add[kSecValueData as String] = Data([0])
+    add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+    let status = SecItemAdd(add as CFDictionary, nil)
+    if status == errSecSuccess { SecItemDelete(base as CFDictionary) }
+    return status == errSecSuccess
   }
 
   func saveCredential(_ credential: Credential, accountID: UUID) throws {
