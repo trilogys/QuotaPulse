@@ -39,6 +39,7 @@ targets:
     info:
       path: AIQuotaApp/Info.plist
       properties:
+        AIQuotaSingleProfile: true
         CFBundleURLTypes:
           - CFBundleURLName: AIQuota
             CFBundleURLSchemes:
