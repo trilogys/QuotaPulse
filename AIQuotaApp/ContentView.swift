@@ -41,7 +41,7 @@ struct ContentView: View {
         }
       }
       .navigationTitle("AI Quota")
-      .toolbar{ToolbarItem(placement:.navigationBarLeading){Button{showingSettings=true}label:{Image(systemName:"gearshape")}};ToolbarItem(placement:.navigationBarTrailing){Menu{Button("Codex · ChatGPT 登录"){loginOAuth(.codex)};Button("Claude · OAuth 登录"){loginOAuth(.claude)};Button("Kimi · OAuth 登录"){loginOAuth(.kimi)};Divider();Button("DeepSeek · API Key"){apiProvider=.deepseek};Button("MiniMax · Coding Key"){apiProvider=.minimax};Button("GLM · Coding Key"){apiProvider=.glm};Button("GitHub Copilot · Token"){apiProvider=.copilot}}label:{Image(systemName:"plus")}}}
+      .toolbar{ToolbarItem(placement:.navigationBarLeading){Button{showingSettings=true}label:{Image(systemName:"gearshape")}};ToolbarItem(placement:.navigationBarTrailing){Menu{Button("Codex · ChatGPT 登录"){loginOAuth(.codex)};Button("Claude · OAuth 登录"){loginOAuth(.claude)};Button("Kimi · OAuth 登录"){loginOAuth(.kimi)};Divider();Button("DeepSeek · API Key"){apiProvider = .deepseek};Button("MiniMax · Coding Key"){apiProvider = .minimax};Button("GLM · Coding Key"){apiProvider = .glm};Button("GitHub Copilot · Token"){apiProvider = .copilot}}label:{Image(systemName:"plus")}}}
       .overlay{if model.isBusy{ZStack{Color.black.opacity(0.08).ignoresSafeArea();ProgressView("处理中…").padding(18).background(.regularMaterial,in:RoundedRectangle(cornerRadius:14))}}}
       .task{await model.load()}.refreshable{await model.refreshAll()}
       .alert("错误",isPresented:Binding(get:{model.errorMessage != nil},set:{if !$0{model.errorMessage=nil}})){Button("好",role:.cancel){model.errorMessage=nil}}message:{Text(model.errorMessage ?? "")}
