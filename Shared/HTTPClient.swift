@@ -1,5 +1,31 @@
 import Foundation
 
+private final class ProxyAuthenticationDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+  let username: String
+  let password: String
+
+  init(username: String, password: String) {
+    self.username = username
+    self.password = password
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    task: URLSessionTask,
+    didReceive challenge: URLAuthenticationChallenge,
+    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+  ) {
+    if challenge.protectionSpace.isProxy, !username.isEmpty {
+      completionHandler(
+        .useCredential,
+        URLCredential(user: username, password: password, persistence: .forSession)
+      )
+    } else {
+      completionHandler(.performDefaultHandling, nil)
+    }
+  }
+}
+
 struct HTTPResult {
   var data: Data
   var response: HTTPURLResponse
@@ -26,7 +52,9 @@ struct HTTPClient: Sendable {
     method: String = "GET",
     headers: [String: String] = [:],
     body: Data? = nil,
-    timeout: TimeInterval = 8
+    timeout: TimeInterval = 8,
+    proxyOverride: AppProxyConfiguration? = nil,
+    proxyPasswordOverride: String? = nil
   ) async throws -> HTTPResult {
     var request = URLRequest(url: url, timeoutInterval: timeout)
     request.httpMethod = method
@@ -40,7 +68,13 @@ struct HTTPClient: Sendable {
     config.requestCachePolicy = .reloadIgnoringLocalCacheData
     config.timeoutIntervalForRequest = timeout
     config.timeoutIntervalForResource = timeout + 2
-    let session = URLSession(configuration: config)
+    let proxy = proxyOverride ?? await SharedStore.shared.proxyConfiguration()
+    if let dictionary = proxy.connectionProxyDictionary() {
+      config.connectionProxyDictionary = dictionary
+    }
+    let password = proxyPasswordOverride ?? (try? KeychainStore.shared.proxyPassword()) ?? ""
+    let delegate = ProxyAuthenticationDelegate(username: proxy.username, password: password)
+    let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
     let (data, response) = try await session.data(for: request)
     guard let http = response as? HTTPURLResponse else {
       throw UsageError.invalidResponse("No HTTP response")

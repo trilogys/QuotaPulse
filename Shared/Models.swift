@@ -87,6 +87,23 @@ struct BalanceSnapshot: Codable, Hashable, Sendable {
   var available: Bool
 }
 
+struct CodexResetCreditSummary: Codable, Hashable, Sendable {
+  var availableCount: Int
+  var expiresAt: [Date]
+  var fetchedAt: Date
+
+  init(availableCount: Int, expiresAt: [Date] = [], fetchedAt: Date = .now) {
+    self.availableCount = max(0, availableCount)
+    self.expiresAt = expiresAt.sorted()
+    self.fetchedAt = fetchedAt
+  }
+}
+
+struct CodexQuotaResetResult: Hashable, Sendable {
+  var code: String
+  var windowsReset: Int
+}
+
 enum ProviderErrorKind: String, Codable, Hashable, Sendable {
   case authentication
   case rateLimited
@@ -117,16 +134,17 @@ struct UsageSnapshot: Codable, Hashable, Sendable, Identifiable {
   var windows: [UsageWindow]
   var metrics: [UsageMetric]
   var balance: BalanceSnapshot?
+  var codexResetCredits: CodexResetCreditSummary?
   var plan: String?
   var errorMessage: String?
   var errorKind: ProviderErrorKind?
   var stale: Bool
 
-  init(accountID: UUID, provider: ProviderID, fetchedAt: Date = .now, windows: [UsageWindow] = [], metrics: [UsageMetric] = [], balance: BalanceSnapshot? = nil, plan: String? = nil, errorMessage: String? = nil, errorKind: ProviderErrorKind? = nil, stale: Bool = false) {
-    self.accountID = accountID; self.provider = provider; self.fetchedAt = fetchedAt; self.windows = windows; self.metrics = metrics; self.balance = balance; self.plan = plan; self.errorMessage = errorMessage; self.errorKind = errorKind; self.stale = stale
+  init(accountID: UUID, provider: ProviderID, fetchedAt: Date = .now, windows: [UsageWindow] = [], metrics: [UsageMetric] = [], balance: BalanceSnapshot? = nil, codexResetCredits: CodexResetCreditSummary? = nil, plan: String? = nil, errorMessage: String? = nil, errorKind: ProviderErrorKind? = nil, stale: Bool = false) {
+    self.accountID = accountID; self.provider = provider; self.fetchedAt = fetchedAt; self.windows = windows; self.metrics = metrics; self.balance = balance; self.codexResetCredits = codexResetCredits; self.plan = plan; self.errorMessage = errorMessage; self.errorKind = errorKind; self.stale = stale
   }
 
-  private enum CodingKeys: String, CodingKey { case accountID, provider, fetchedAt, windows, metrics, balance, plan, errorMessage, errorKind, stale }
+  private enum CodingKeys: String, CodingKey { case accountID, provider, fetchedAt, windows, metrics, balance, codexResetCredits, plan, errorMessage, errorKind, stale }
 
   init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -136,6 +154,7 @@ struct UsageSnapshot: Codable, Hashable, Sendable, Identifiable {
     windows = try c.decodeIfPresent([UsageWindow].self, forKey: .windows) ?? []
     metrics = try c.decodeIfPresent([UsageMetric].self, forKey: .metrics) ?? []
     balance = try c.decodeIfPresent(BalanceSnapshot.self, forKey: .balance)
+    codexResetCredits = try c.decodeIfPresent(CodexResetCreditSummary.self, forKey: .codexResetCredits)
     plan = try c.decodeIfPresent(String.self, forKey: .plan)
     errorMessage = try c.decodeIfPresent(String.self, forKey: .errorMessage)
     errorKind = try c.decodeIfPresent(ProviderErrorKind.self, forKey: .errorKind)

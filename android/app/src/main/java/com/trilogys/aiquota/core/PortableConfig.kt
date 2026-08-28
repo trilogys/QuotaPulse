@@ -30,7 +30,7 @@ object PortableConfigCodec {
 
     fun decode(raw: String): List<ImportedAccount> {
         val root = JSONObject(raw)
-        require(root.optString("format") == FORMAT) { "Not an AI Quota configuration file" }
+        require(root.optString("format") == FORMAT) { "Not a QuotaPulse configuration file" }
         val version = root.optInt("version", 0)
         require(version in 1..VERSION) { "Unsupported configuration version $version" }
         val array = root.getJSONArray("accounts")

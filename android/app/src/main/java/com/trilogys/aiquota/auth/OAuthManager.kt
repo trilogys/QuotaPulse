@@ -207,7 +207,7 @@ class OAuthManager(
             val path = requestLine.split(" ").getOrNull(1) ?: error("Invalid OAuth callback")
             val host = if (server.localPort == 1455) "localhost" else "localhost:${server.localPort}"
             val callback = if (server.localPort == 1455) "http://localhost$path" else "http://$host$path"
-            val html = "<html><body><h3>AIQuota authorization complete.</h3><p>You can return to the app.</p></body></html>"
+            val html = "<html><body><h3>QuotaPulse authorization complete.</h3><p>You can return to the app.</p></body></html>"
             val bytes = html.toByteArray()
             socket.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
             socket.getOutputStream().write(bytes)

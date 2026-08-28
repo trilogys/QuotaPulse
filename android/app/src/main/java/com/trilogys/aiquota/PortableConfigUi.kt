@@ -39,7 +39,7 @@ fun PortableConfigSection(onChanged: suspend () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("导入与导出", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Switch(checked = replace, onCheckedChange = { replace = it }); Text(if (replace) "替换现有账号" else "合并导入") }
-        Button(onClick = { importLauncher.launch(arrayOf("application/json", "text/json", "application/octet-stream")) }) { Text("导入 AI Quota 配置") }
+        Button(onClick = { importLauncher.launch(arrayOf("application/json", "text/json", "application/octet-stream")) }) { Text("导入 QuotaPulse 配置") }
         Button(onClick = { pendingExport = manager.export(false); exportLauncher.launch("ai-quota-native.json") }) { Text("导出配置（不含凭据）") }
         Button(onClick = { pendingSensitiveExport = true }) { Text("完整备份（含 Token / API Key）") }
         Text("完整备份可用于 iOS 与 Android 之间迁移登录状态。文件包含敏感凭据，请只保存到可信位置。", style = MaterialTheme.typography.bodySmall)

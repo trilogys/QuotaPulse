@@ -25,6 +25,16 @@ actor UsageService {
   private let http = HTTPClient.shared
   private let keychain = KeychainStore.shared
 
+  private struct CodexResetCreditCandidate {
+    let id: String
+    let expiresAt: Date?
+  }
+
+  private struct CodexResetCreditPayload {
+    let summary: CodexResetCreditSummary
+    let candidates: [CodexResetCreditCandidate]
+  }
+
   @discardableResult
   func refresh(accountID: UUID) async throws -> UsageSnapshot {
     guard let account = await SharedStore.shared.account(id: accountID) else { throw UsageError.missingAccount }
@@ -57,6 +67,79 @@ actor UsageService {
     return await refresh(accountIDs: accounts.map(\.id))
   }
 
+  func queryCodexResetCredits(accountID: UUID) async throws -> CodexResetCreditSummary {
+    guard let account = await SharedStore.shared.account(id: accountID), account.provider == .codex else {
+      throw UsageError.missingAccount
+    }
+    guard var credential = try keychain.credential(accountID: accountID) else {
+      throw UsageError.missingCredential
+    }
+    let payload = try await fetchCodexResetCreditPayload(account: account, credential: &credential)
+    var snapshot = await SharedStore.shared.snapshot(for: accountID)
+      ?? UsageSnapshot(accountID: accountID, provider: .codex)
+    snapshot.codexResetCredits = payload.summary
+    await SharedStore.shared.saveSnapshot(snapshot)
+    return payload.summary
+  }
+
+  func consumeCodexResetCredit(accountID: UUID) async throws -> CodexQuotaResetResult {
+    guard let account = await SharedStore.shared.account(id: accountID), account.provider == .codex else {
+      throw UsageError.missingAccount
+    }
+    guard var credential = try keychain.credential(accountID: accountID) else {
+      throw UsageError.missingCredential
+    }
+
+    let payload = try await fetchCodexResetCreditPayload(account: account, credential: &credential)
+    guard payload.summary.availableCount > 0 else {
+      throw UsageError.invalidResponse("No Codex reset credits available")
+    }
+    let candidate = payload.candidates.sorted {
+      ($0.expiresAt ?? .distantFuture) < ($1.expiresAt ?? .distantFuture)
+    }.first
+    guard let creditID = candidate?.id, !creditID.isEmpty else {
+      throw UsageError.invalidResponse("Reset credit details did not include credit_id")
+    }
+
+    let requestID = UUID().uuidString.lowercased()
+    let body = try JSONSerialization.data(withJSONObject: [
+      "credit_id": creditID,
+      "redeem_request_id": requestID,
+    ])
+    func call(_ credential: Credential) async throws -> HTTPResult {
+      var headers = codexQuotaHeaders(credential)
+      headers["Content-Type"] = "application/json"
+      return try await http.send(
+        URL(string: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume")!,
+        method: "POST",
+        headers: headers,
+        body: body,
+        timeout: 20
+      )
+    }
+    let result: HTTPResult
+    do {
+      var response = try await call(credential)
+      if response.statusCode == 401, credential.refreshToken != nil {
+        credential = try await refreshCodexCredential(credential, accountID: accountID)
+        response = try await call(credential)
+      }
+      result = response
+    } catch {
+      await invalidateCodexResetCredits(accountID: accountID)
+      throw UsageError.refreshFailed("Reset result unknown; query reset credits before retrying: \(error.localizedDescription)")
+    }
+    guard (200..<300).contains(result.statusCode) else {
+      await invalidateCodexResetCredits(accountID: accountID)
+      throw UsageError.http(result.statusCode, String(data: result.data, encoding: .utf8) ?? "")
+    }
+    let root = try result.jsonDictionary()
+    return CodexQuotaResetResult(
+      code: string(root["code"]) ?? "ok",
+      windowsReset: Int(number(root["windows_reset"]) ?? 0)
+    )
+  }
+
   private func fetch(account: AccountRecord) async throws -> UsageSnapshot {
     guard var credential = try keychain.credential(accountID: account.id) else { throw UsageError.missingCredential }
     switch account.provider {
@@ -72,9 +155,10 @@ actor UsageService {
 
   private func fetchCodex(account: AccountRecord, credential: inout Credential) async throws -> UsageSnapshot {
     func call(_ credential: Credential) async throws -> HTTPResult {
-      var headers = ["Authorization": "Bearer \(credential.accessToken)", "User-Agent": "codex-cli", "Accept": "application/json"]
-      if let accountID = credential.accountID, !accountID.isEmpty { headers["chatgpt-account-id"] = accountID }
-      return try await http.send(URL(string: "https://chatgpt.com/backend-api/wham/usage")!, headers: headers)
+      try await http.send(
+        URL(string: "https://chatgpt.com/backend-api/wham/usage")!,
+        headers: codexQuotaHeaders(credential)
+      )
     }
     var result = try await call(credential)
     if result.statusCode == 401, credential.refreshToken != nil { credential = try await refreshCodexCredential(credential, accountID: account.id); result = try await call(credential) }
@@ -94,7 +178,101 @@ actor UsageService {
     }
     windows = uniqueWindows(windows)
     guard !windows.isEmpty else { throw UsageError.invalidResponse("No Codex quota windows") }
-    return UsageSnapshot(accountID: account.id, provider: .codex, windows: windows)
+    let resetCredits: CodexResetCreditSummary?
+    if let current = codexResetCreditPayload(from: root)?.summary {
+      resetCredits = current
+    } else {
+      let cached = await SharedStore.shared.snapshot(for: account.id)
+      resetCredits = cached?.codexResetCredits
+    }
+    return UsageSnapshot(accountID: account.id, provider: .codex, windows: windows, codexResetCredits: resetCredits)
+  }
+
+  private func fetchCodexResetCreditPayload(
+    account: AccountRecord,
+    credential: inout Credential
+  ) async throws -> CodexResetCreditPayload {
+    func call(_ credential: Credential) async throws -> HTTPResult {
+      try await http.send(
+        URL(string: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits")!,
+        headers: codexQuotaHeaders(credential),
+        timeout: 20
+      )
+    }
+    var result = try await call(credential)
+    if result.statusCode == 401, credential.refreshToken != nil {
+      credential = try await refreshCodexCredential(credential, accountID: account.id)
+      result = try await call(credential)
+    }
+    guard (200..<300).contains(result.statusCode) else {
+      throw UsageError.http(result.statusCode, String(data: result.data, encoding: .utf8) ?? "")
+    }
+    let root = try result.jsonDictionary()
+    guard let payload = codexResetCreditPayload(from: root) else {
+      throw UsageError.invalidResponse("Missing Codex reset credit data")
+    }
+    return payload
+  }
+
+  private func invalidateCodexResetCredits(accountID: UUID) async {
+    guard var snapshot = await SharedStore.shared.snapshot(for: accountID) else { return }
+    snapshot.codexResetCredits = nil
+    await SharedStore.shared.saveSnapshot(snapshot)
+  }
+
+  private func codexQuotaHeaders(_ credential: Credential) -> [String: String] {
+    var headers = [
+      "Authorization": "Bearer \(credential.accessToken)",
+      "Accept": "application/json",
+      "Accept-Language": "zh-CN",
+      "User-Agent": "codex-cli",
+      "openai-beta": "codex-1",
+      "originator": "Codex Desktop",
+      "Sec-Fetch-Site": "none",
+      "Sec-Fetch-Mode": "no-cors",
+      "Sec-Fetch-Dest": "empty",
+    ]
+    if let accountID = credential.accountID, !accountID.isEmpty {
+      headers["chatgpt-account-id"] = accountID
+    }
+    return headers
+  }
+
+  private func codexResetCreditPayload(from root: [String: Any]) -> CodexResetCreditPayload? {
+    var containers: [[String: Any]] = []
+    if let nested = dictionary(root["rate_limit_reset_credits"]) { containers.append(nested) }
+    if let data = dictionary(root["data"]) {
+      if let nested = dictionary(data["rate_limit_reset_credits"]) { containers.append(nested) }
+      containers.append(data)
+    }
+    containers.append(root)
+
+    var directRecords: [[String: Any]] = []
+    if let records = root["rate_limit_reset_credits"] as? [[String: Any]] { directRecords = records }
+
+    for container in containers {
+      let records = (container["credits"] as? [[String: Any]])
+        ?? (container["items"] as? [[String: Any]])
+        ?? directRecords
+      let explicitCount = number(container["available_count"] ?? container["availableCount"])
+      guard explicitCount != nil || !records.isEmpty else { continue }
+
+      let candidates = records.compactMap { item -> CodexResetCreditCandidate? in
+        let id = string(item["id"] ?? item["credit_id"] ?? item["creditId"])
+        guard let id else { return nil }
+        let expiresAt = parseDate(item["expires_at"] ?? item["expiresAt"])
+        return CodexResetCreditCandidate(id: id, expiresAt: expiresAt)
+      }
+      let expirations = records.compactMap {
+        parseDate($0["expires_at"] ?? $0["expiresAt"])
+      }
+      let count = Int(explicitCount ?? Double(records.count))
+      return CodexResetCreditPayload(
+        summary: CodexResetCreditSummary(availableCount: count, expiresAt: expirations),
+        candidates: candidates
+      )
+    }
+    return nil
   }
 
   private func refreshCodexCredential(_ credential: Credential, accountID: UUID) async throws -> Credential {

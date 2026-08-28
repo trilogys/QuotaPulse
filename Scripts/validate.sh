@@ -27,8 +27,32 @@ theme=Path('Shared/DashboardTheme.swift').read_text(encoding='utf-8')
 store=Path('Shared/SharedStore.swift').read_text(encoding='utf-8')
 assert 'enum DashboardTheme' in theme
 assert all(case in theme for case in ['case neon', 'case graphite', 'case aurora', 'case daylight'])
+assert 'defaultValue: DashboardTheme = .daylight' in theme
 assert 'dashboardTheme' in store
 print('dashboard themes: ok')
+
+proxy=Path('Shared/ProxyConfiguration.swift').read_text(encoding='utf-8')
+http=Path('Shared/HTTPClient.swift').read_text(encoding='utf-8')
+loopback=Path('AIQuotaApp/LoopbackOAuthServer.swift').read_text(encoding='utf-8')
+assert 'case http' in proxy and 'case socks5' in proxy
+assert 'connectionProxyDictionary' in http and 'ProxyAuthenticationDelegate' in http
+assert 'requiredLocalEndpoint' not in loopback and 'allowLocalEndpointReuse' in loopback
+print('proxy / OAuth networking: ok')
+
+history=Path('Shared/UsageHistory.swift').read_text(encoding='utf-8')
+history_view=Path('AIQuotaApp/UsageHistoryView.swift').read_text(encoding='utf-8')
+usage=Path('Shared/UsageService.swift').read_text(encoding='utf-8')
+assert 'UsageHistorySample' in history and 'UsageHistoryMetricKind' in history
+assert 'import Charts' in history_view
+assert all(value in history_view for value in ['case ring', 'case bar', 'case line'])
+assert 'aggregateHistory' in store and 'clearHistory' in store
+assert 'rate-limit-reset-credits/consume' in usage
+assert all(value in usage for value in ['credit_id', 'redeem_request_id', 'queryCodexResetCredits', 'consumeCodexResetCredit'])
+print('local usage history / charts: ok')
+
+icons=list(Path('AIQuotaApp/Assets.xcassets/AppIcon.appiconset').glob('AppIcon-*.png'))
+assert len(icons)==15
+print('AppIcon catalog: ok')
 
 models=Path('Shared/Models.swift').read_text(encoding='utf-8')
 health=Path('Shared/ProviderHealth.swift').read_text(encoding='utf-8')
@@ -55,6 +79,8 @@ grep -q 'build_app_only_ipa.sh' .github/workflows/ipa.yml
 grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 16.0' Config.xcconfig
 grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 16.0' Config.single-profile.xcconfig
 grep -q 'AIQUOTA_RELEASE_STORE_FILE: ../release.keystore' .github/workflows/android.yml
+grep -q 'ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon' project.yml
+grep -q 'ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon' project.single-profile.yml
 echo "signing / IPA configuration: ok"
 
 python3 - <<'PY'

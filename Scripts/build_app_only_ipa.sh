@@ -78,7 +78,7 @@ RESIGN_IPA="$ROOT/$OUT_DIR/AIQuota-app-only-resign.ipa"
 cp "$IPA" "$RESIGN_IPA"
 
 cat > "$ROOT/$OUT_DIR/AIQuota-app-only-signing-info.txt" <<INFO
-AIQuota Native app-only unsigned / re-sign IPA
+QuotaPulse app-only unsigned / re-sign IPA
 Minimum iOS: 16.0
 Main bundle ID before re-signing: $APP_BUNDLE
 Widget extension: not included

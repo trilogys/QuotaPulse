@@ -22,6 +22,8 @@ enum SharedCredentialAccessStatus: Sendable, Equatable {
 
 struct KeychainStore: Sendable {
   static let shared = KeychainStore()
+  private static let proxyService = "AIQuota.Proxy"
+  private static let proxyPasswordAccount = "default"
 
   private var accessGroup: String? {
     guard let suffix = Bundle.main.object(forInfoDictionaryKey: AppConfig.keychainSuffixInfoKey) as? String, !suffix.isEmpty else { return nil }
@@ -103,5 +105,36 @@ struct KeychainStore: Sendable {
   func deleteCredential(accountID: UUID) throws {
     let query=try credentialQuery([kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:AppConfig.keychainService,kSecAttrAccount as String:accountID.uuidString])
     let status=SecItemDelete(query as CFDictionary);guard status==errSecSuccess||status==errSecItemNotFound else{throw KeychainError.unexpectedStatus(status)}
+  }
+
+  func saveProxyPassword(_ password: String) throws {
+    var query = try credentialQuery([
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: Self.proxyService,
+      kSecAttrAccount as String: Self.proxyPasswordAccount,
+    ])
+    SecItemDelete(query as CFDictionary)
+    guard !password.isEmpty else { return }
+    query[kSecValueData as String] = Data(password.utf8)
+    query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+    let status = SecItemAdd(query as CFDictionary, nil)
+    guard status == errSecSuccess else { throw KeychainError.unexpectedStatus(status) }
+  }
+
+  func proxyPassword() throws -> String {
+    var query = try credentialQuery([
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: Self.proxyService,
+      kSecAttrAccount as String: Self.proxyPasswordAccount,
+    ])
+    query[kSecReturnData as String] = true
+    query[kSecMatchLimit as String] = kSecMatchLimitOne
+    var result: CFTypeRef?
+    let status = SecItemCopyMatching(query as CFDictionary, &result)
+    if status == errSecItemNotFound { return "" }
+    guard status == errSecSuccess else { throw KeychainError.unexpectedStatus(status) }
+    guard let data = result as? Data, let password = String(data: data, encoding: .utf8)
+    else { throw KeychainError.invalidData }
+    return password
   }
 }

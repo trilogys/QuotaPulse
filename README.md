@@ -1,4 +1,4 @@
-# AIQuota Native v0.11.0
+# QuotaPulse
 
 AI 服务额度监控：**原生 iOS + 原生 Android + 桌面小组件 + 多账号 + 本机凭据保存 + 后台刷新**。
 
@@ -15,11 +15,12 @@ iOS 端还保留 MiniMax、GLM / Z.ai、GitHub Copilot 等适配，后续逐步�
 
 ## Visual direction
 
-AIQuota 不直接复制某一个项目的 UI，而是组合三个方向：
+QuotaPulse 不直接复制某一个项目的 UI，而是组合三个方向：
 
 - **claude-widget-ios**：iOS 原生 SwiftUI / WidgetKit 的简洁信息密度与系统风格
 - **CodexBar**：额度窗口层级、session/weekly/reset 信息架构、stale/error 状态
-- **AIQuota 自身**：多账号总览、推荐账号、单账号刷新、Provider/账号级 Widget 配置
+- **ScriptableTokenWidgets**：明亮主题的白色圆角卡片、橙红趋势、圆环与紧凑统计层级
+- **QuotaPulse 自身**：多账号总览、推荐账号、单账号刷新、Provider/账号级 Widget 配置
 
 最终风格原则：**原生、紧凑、额度优先、刷新状态清晰，不做重装饰 Dashboard。**
 
@@ -40,6 +41,10 @@ AIQuota 不直接复制某一个项目的 UI，而是组合三个方向：
 - 凭据健康状态：正常 / 即将续期 / 可续期 / 需重登 / 缓存
 - Codex / Claude / Kimi 原账号一键重新认证，保持 UUID 与 Widget 绑定不变
 - 额度 Reset 倒计时
+- Codex 5h / 周额度重置安排、可用重置次数查询和用户确认后手动重置
+- 最近 31 天本机历史：今天 / 近 7 天 / 近 30 天
+- 圆环 / 柱状 / 折线图切换，显示真实峰值使用率和日期
+- “全部”页可选择按 Provider 分开展示或叠加汇总
 - WidgetKit Small / Medium / Large 自适应信息密度
 - Widget 内 `↻` 原地刷新，不打开主 App
 - Widget timeline 自动刷新

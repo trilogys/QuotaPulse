@@ -3,10 +3,28 @@ import SwiftUI
 import UIKit
 import WidgetKit
 
+private enum AccountSortMode: String, CaseIterable, Identifiable {
+  case manual
+  case available
+  case risk
+
+  var id: String { rawValue }
+
+  var title: String {
+    switch self {
+    case .manual: "自定义"
+    case .available: "额度优先"
+    case .risk: "风险优先"
+    }
+  }
+}
+
 struct ContentView: View {
   @StateObject private var model = AppModel()
-  @State private var selectedTheme: DashboardTheme = .neon
+  @State private var selectedTheme: DashboardTheme = .daylight
   @State private var selectedProvider: ProviderID?
+  @State private var sortMode: AccountSortMode = .manual
+  @State private var aggregateHistory = false
   @State private var apiProvider: ProviderID?
   @State private var renameTarget: AccountRecord?
   @State private var renameText = ""
@@ -27,8 +45,13 @@ struct ContentView: View {
               providerCount: Set(model.accounts.filter(\.isEnabled).map(\.provider)).count,
               lastUpdatedAt: model.snapshots.values.map(\.fetchedAt).max()
             )
+            UsageHistoryDashboard(
+              history: enabledUsageHistory,
+              accounts: enabledAccounts,
+              selectedProvider: selectedProvider,
+              aggregateProviders: aggregateHistory
+            )
             accountSection
-            buildModeNote
           }
           .padding(.horizontal, 18)
           .padding(.top, 10)
@@ -43,13 +66,14 @@ struct ContentView: View {
               .tint(.white)
               .padding(.horizontal, 22)
               .padding(.vertical, 16)
-              .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+              .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: selectedTheme.compactCardCornerRadius))
           }
         }
       }
       .toolbar(.hidden, for: .navigationBar)
       .task {
         selectedTheme = await SharedStore.shared.dashboardTheme()
+        aggregateHistory = await SharedStore.shared.aggregateHistory()
         await model.load()
       }
       .alert(
@@ -62,6 +86,17 @@ struct ContentView: View {
         Button("好", role: .cancel) { model.errorMessage = nil }
       } message: {
         Text(model.errorMessage ?? "")
+      }
+      .alert(
+        "提示",
+        isPresented: Binding(
+          get: { model.statusMessage != nil },
+          set: { if !$0 { model.statusMessage = nil } }
+        )
+      ) {
+        Button("好", role: .cancel) { model.statusMessage = nil }
+      } message: {
+        Text(model.statusMessage ?? "")
       }
       .alert(
         "重命名账号",
@@ -85,7 +120,11 @@ struct ContentView: View {
         }
       }
       .sheet(isPresented: $showingSettings) {
-        SettingsView(model: model, selectedTheme: $selectedTheme)
+        SettingsView(
+          model: model,
+          selectedTheme: $selectedTheme,
+          aggregateHistory: $aggregateHistory
+        )
       }
     }
     .environment(\.dashboardTheme, selectedTheme)
@@ -95,12 +134,16 @@ struct ContentView: View {
   private var header: some View {
     HStack(alignment: .center, spacing: 12) {
       VStack(alignment: .leading, spacing: 4) {
-        Text("AI QUOTA")
+        Text("QuotaPulse")
           .font(.system(size: 12, weight: .bold))
           .foregroundStyle(selectedTheme.secondary)
+          .lineLimit(1)
         Text("额度总览")
           .font(.system(size: 30, weight: .bold))
+          .lineLimit(1)
+          .minimumScaleFactor(0.78)
       }
+      .layoutPriority(1)
       Spacer()
       livePill
       iconButton(systemName: "gearshape") { showingSettings = true }
@@ -182,6 +225,23 @@ struct ContentView: View {
           .padding(.vertical, 4)
           .background(selectedTheme.surfaceRaised, in: Capsule())
         Spacer()
+        Menu {
+          ForEach(AccountSortMode.allCases) { mode in
+            Button {
+              sortMode = mode
+            } label: {
+              HStack {
+                Text(mode.title)
+                if sortMode == mode { Image(systemName: "checkmark") }
+              }
+            }
+          }
+        } label: {
+          Label(sortMode.title, systemImage: "arrow.up.arrow.down")
+            .font(.system(size: 11, weight: .semibold))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(selectedTheme.secondaryText)
         Button {
           Task { await model.refreshAll() }
         } label: {
@@ -205,6 +265,8 @@ struct ContentView: View {
             health: model.credentialHealth(account),
             onRefresh: { await model.refresh(account) },
             onReauthenticate: { await reauthenticate(account) },
+            onQueryResetCredits: { await model.queryCodexResetCredits(account) },
+            onResetCodexQuota: { await model.resetCodexQuota(account) },
             onRename: {
               renameTarget = account
               renameText = account.label
@@ -219,33 +281,42 @@ struct ContentView: View {
     }
   }
 
-  private var buildModeNote: some View {
-    HStack(spacing: 9) {
-      Image(systemName: AppConfig.isAppOnlyBuild ? "iphone" : "rectangle.stack.badge.person.crop")
-      Text(AppConfig.isAppOnlyBuild ? "单 App 兼容版" : "App + Widget 完整版")
-      Spacer()
-      Text("iOS 16+")
+  private var filteredAccounts: [AccountRecord] {
+    let values = selectedProvider.map { provider in
+      model.accounts.filter { $0.provider == provider }
+    } ?? model.accounts
+    switch sortMode {
+    case .manual:
+      return values
+    case .available:
+      return values.sorted { score(for: $0) > score(for: $1) }
+    case .risk:
+      return values.sorted {
+        let lhs = score(for: $0)
+        let rhs = score(for: $1)
+        return (lhs < 0 ? 101 : lhs) < (rhs < 0 ? 101 : rhs)
+      }
     }
-    .font(.system(size: 11, weight: .medium))
-    .foregroundStyle(selectedTheme.secondaryText)
-    .padding(.top, 2)
   }
 
-  private var filteredAccounts: [AccountRecord] {
-    guard let selectedProvider else { return model.accounts }
-    return model.accounts.filter { $0.provider == selectedProvider }
+  private var enabledAccounts: [AccountRecord] {
+    model.accounts.filter(\.isEnabled)
+  }
+
+  private var enabledUsageHistory: [UsageHistorySample] {
+    let ids = Set(enabledAccounts.map(\.id))
+    return model.usageHistory.filter { ids.contains($0.accountID) }
   }
 
   private var featuredAccount: AccountRecord? {
     filteredAccounts
       .filter(\.isEnabled)
       .max { score(for: $0) < score(for: $1) }
-      ?? filteredAccounts.first
   }
 
   private func score(for account: AccountRecord) -> Double {
     guard let snapshot = model.snapshots[account.id], !snapshot.stale else { return -1 }
-    if let balance = snapshot.balance { return balance.total }
+    if let balance = snapshot.balance { return balance.available && balance.total > 0 ? 100 : 0 }
     return snapshot.windows.map(\.remainingPercent).min() ?? -1
   }
 
@@ -341,9 +412,11 @@ private struct DashboardSummary: View {
           Text(account?.label ?? "等待添加账号")
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(theme.secondaryText)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
           Text(primaryValue)
             .font(.system(size: 38, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(theme.primaryText)
           Text(primaryLabel)
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(accent)
@@ -377,8 +450,8 @@ private struct DashboardSummary: View {
     }
     .padding(20)
     .background(theme.surface)
-    .clipShape(RoundedRectangle(cornerRadius: 8))
-    .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.border, lineWidth: 1))
+    .clipShape(RoundedRectangle(cornerRadius: theme.cardCornerRadius))
+    .overlay(RoundedRectangle(cornerRadius: theme.cardCornerRadius).stroke(theme.border, lineWidth: 1))
   }
 }
 
@@ -418,8 +491,8 @@ private struct EmptyAccountsView: View {
     }
     .frame(maxWidth: .infinity, minHeight: 150)
     .background(theme.surface)
-    .clipShape(RoundedRectangle(cornerRadius: 8))
-    .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.border, lineWidth: 1))
+    .clipShape(RoundedRectangle(cornerRadius: theme.cardCornerRadius))
+    .overlay(RoundedRectangle(cornerRadius: theme.cardCornerRadius).stroke(theme.border, lineWidth: 1))
   }
 }
 
@@ -432,6 +505,8 @@ private struct AccountDashboardCard: View {
   let health: CredentialHealth
   let onRefresh: () async -> Void
   let onReauthenticate: () async -> Void
+  let onQueryResetCredits: () async -> Void
+  let onResetCodexQuota: () async -> Void
   let onRename: () -> Void
   let onToggle: () -> Void
   let onMoveUp: () -> Void
@@ -471,7 +546,13 @@ private struct AccountDashboardCard: View {
       }
 
       if let snapshot {
-        SnapshotDashboardBody(snapshot: snapshot, accent: accent, cooldownUntil: cooldownUntil)
+        SnapshotDashboardBody(
+          snapshot: snapshot,
+          accent: accent,
+          cooldownUntil: cooldownUntil,
+          onQueryResetCredits: onQueryResetCredits,
+          onResetCodexQuota: onResetCodexQuota
+        )
       } else {
         HStack(spacing: 8) {
           Image(systemName: "clock")
@@ -510,7 +591,7 @@ private struct AccountDashboardCard: View {
 
         Spacer()
         if !account.isEnabled {
-          Text("已隐藏")
+          Text("已停用")
             .font(.system(size: 10, weight: .semibold))
             .foregroundStyle(theme.warning)
         }
@@ -521,8 +602,8 @@ private struct AccountDashboardCard: View {
     }
     .padding(16)
     .background(theme.surface)
-    .clipShape(RoundedRectangle(cornerRadius: 8))
-    .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.border, lineWidth: 1))
+    .clipShape(RoundedRectangle(cornerRadius: theme.cardCornerRadius))
+    .overlay(RoundedRectangle(cornerRadius: theme.cardCornerRadius).stroke(theme.border, lineWidth: 1))
     .opacity(account.isEnabled ? 1 : 0.62)
   }
 
@@ -530,7 +611,7 @@ private struct AccountDashboardCard: View {
     Menu {
       Button(action: onRename) { Label("重命名", systemImage: "pencil") }
       Button(action: onToggle) {
-        Label(account.isEnabled ? "隐藏" : "显示", systemImage: account.isEnabled ? "eye.slash" : "eye")
+        Label(account.isEnabled ? "停用" : "启用", systemImage: account.isEnabled ? "pause.circle" : "play.circle")
       }
       Button(action: onMoveUp) { Label("上移", systemImage: "arrow.up") }
       Button(action: onMoveDown) { Label("下移", systemImage: "arrow.down") }
@@ -567,6 +648,8 @@ private struct SnapshotDashboardBody: View {
   let snapshot: UsageSnapshot
   let accent: Color
   let cooldownUntil: Date?
+  let onQueryResetCredits: () async -> Void
+  let onResetCodexQuota: () async -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -614,6 +697,16 @@ private struct SnapshotDashboardBody: View {
           .foregroundStyle(theme.secondaryText)
       }
 
+      if snapshot.provider == .codex, !snapshot.windows.isEmpty {
+        CodexResetSchedule(
+          windows: snapshot.windows,
+          resetCredits: snapshot.codexResetCredits,
+          accent: accent,
+          onQuery: onQueryResetCredits,
+          onReset: onResetCodexQuota
+        )
+      }
+
       HStack(spacing: 7) {
         Text("更新 \(snapshot.fetchedAt.formatted(date: .omitted, time: .shortened))")
         if snapshot.stale {
@@ -636,6 +729,99 @@ private struct SnapshotDashboardBody: View {
 
   private var hasCachedData: Bool {
     !snapshot.windows.isEmpty || !snapshot.metrics.isEmpty || snapshot.balance != nil
+  }
+}
+
+private struct CodexResetSchedule: View {
+  @Environment(\.dashboardTheme) private var theme
+  let windows: [UsageWindow]
+  let resetCredits: CodexResetCreditSummary?
+  let accent: Color
+  let onQuery: () async -> Void
+  let onReset: () async -> Void
+
+  @State private var querying = false
+  @State private var resetting = false
+  @State private var confirmingReset = false
+
+  private var shortWindow: UsageWindow? {
+    windows.first { $0.label.lowercased().contains("h") }
+  }
+
+  private var weeklyWindow: UsageWindow? {
+    windows.first { $0.label == "周" || $0.label.lowercased().contains("week") }
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 9) {
+      HStack {
+        Label("Codex 额度与重置", systemImage: "clock.arrow.2.circlepath")
+          .foregroundStyle(accent)
+          .lineLimit(1)
+        Spacer()
+        Text(resetCredits.map { "可用 \($0.availableCount) 次" } ?? "次数未查询")
+          .foregroundStyle(theme.secondaryText)
+          .lineLimit(1)
+      }
+      .font(.system(size: 9, weight: .semibold))
+
+      HStack(spacing: 12) {
+        if let reset = shortWindow?.resetAt, reset > .now {
+          Label("5h · \(resetCountdown(reset))", systemImage: "timer")
+        }
+        if let reset = weeklyWindow?.resetAt, reset > .now {
+          Label("周 · \(resetCountdown(reset))", systemImage: "calendar")
+        }
+      }
+      .font(.system(size: 9, weight: .medium))
+      .foregroundStyle(theme.secondaryText)
+      .lineLimit(1)
+      .minimumScaleFactor(0.75)
+
+      if let expiry = resetCredits?.expiresAt.first {
+        Text("最早一张重置卡到期：\(expiry.formatted(date: .abbreviated, time: .shortened))")
+          .font(.system(size: 9, weight: .medium))
+          .foregroundStyle(theme.secondaryText)
+      }
+
+      HStack(spacing: 10) {
+        Button {
+          querying = true
+          Task {
+            await onQuery()
+            querying = false
+          }
+        } label: {
+          Label(querying ? "查询中" : "查询重置", systemImage: "magnifyingglass")
+        }
+        .disabled(querying || resetting)
+
+        Button(role: .destructive) {
+          confirmingReset = true
+        } label: {
+          Label(resetting ? "重置中" : "重置额度", systemImage: "arrow.counterclockwise.circle")
+        }
+        .disabled((resetCredits?.availableCount ?? 0) <= 0 || querying || resetting)
+      }
+      .font(.system(size: 10, weight: .semibold))
+      .buttonStyle(.plain)
+      .lineLimit(1)
+      .minimumScaleFactor(0.75)
+    }
+    .padding(10)
+    .background(accent.opacity(0.08), in: RoundedRectangle(cornerRadius: theme.compactCardCornerRadius))
+    .alert("消耗一次重置机会？", isPresented: $confirmingReset) {
+      Button("取消", role: .cancel) {}
+      Button("确认重置", role: .destructive) {
+        resetting = true
+        Task {
+          await onReset()
+          resetting = false
+        }
+      }
+    } message: {
+      Text("当前可用 \(resetCredits?.availableCount ?? 0) 次。确认后会消耗一张 OpenAI 重置卡，并重置适用的额度窗口。")
+    }
   }
 }
 
@@ -721,8 +907,10 @@ struct CredentialHealth {
 struct SettingsView: View {
   @ObservedObject var model: AppModel
   @Binding var selectedTheme: DashboardTheme
+  @Binding var aggregateHistory: Bool
   @Environment(\.dismiss) private var dismiss
   @State private var autoMinutes = 15
+  @State private var confirmingHistoryClear = false
 
   var body: some View {
     NavigationStack {
@@ -736,12 +924,28 @@ struct SettingsView: View {
           .pickerStyle(.menu)
           ThemePreviewRow(theme: selectedTheme)
         }
+        Section("网络") {
+          NavigationLink {
+            ProxySettingsView()
+          } label: {
+            Label("HTTP / SOCKS5 代理", systemImage: "network")
+          }
+        }
+        Section("走势图") {
+          Toggle("全部页合并走势图", isOn: $aggregateHistory)
+          Group {
+            if aggregateHistory {
+              Text("“全部”页会在一张图中叠加各平台曲线；余额类数据仍单独展示。")
+            } else {
+              Text("“全部”页按平台分别展示走势图。")
+            }
+          }
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+        }
         if AppConfig.isAppOnlyBuild {
           Section("刷新") {
             Label("支持单账号刷新、全部刷新和下拉刷新", systemImage: "arrow.clockwise")
-            Text("当前安装的是单 App 兼容版，不包含桌面小组件。")
-              .font(.footnote)
-              .foregroundStyle(.secondary)
           }
         } else {
           Section("自动刷新") {
@@ -766,6 +970,31 @@ struct SettingsView: View {
           Text("配置文件可在 iOS 与 Android 之间共用。完整备份可包含登录凭据。")
             .font(.footnote)
             .foregroundStyle(.secondary)
+          Button(role: .destructive) {
+            confirmingHistoryClear = true
+          } label: {
+            Label("清除本机走势历史", systemImage: "trash")
+          }
+          .disabled(model.usageHistory.isEmpty)
+        }
+        Section("隐私与本机存储") {
+          Label("配置仅保存在本机", systemImage: "lock.shield")
+          Text("账号配置和走势图保存在本机；Token 与 API Key 由系统 Keychain 保护。额度请求只发往对应服务或你配置的代理，不经过 QuotaPulse 自建服务器。")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        Section("版本与兼容性") {
+          if AppConfig.isAppOnlyBuild {
+            Label("单 App 兼容版", systemImage: "iphone")
+          } else {
+            Label("App + Widget 完整版", systemImage: "rectangle.stack.badge.person.crop")
+          }
+          LabeledContent("系统要求", value: "iOS 16+")
+          if AppConfig.isAppOnlyBuild {
+            Text("当前安装包不包含桌面小组件，适合只有一套 P12 / 描述文件或使用第三方重签工具的场景。")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
         }
         Section("凭据状态") {
           ForEach(model.accounts) { account in
@@ -782,7 +1011,7 @@ struct SettingsView: View {
             }
           }
         }
-        Section("显示账号") {
+        Section("账号参与范围") {
           ForEach(model.accounts) { account in
             Toggle(
               account.label,
@@ -792,11 +1021,22 @@ struct SettingsView: View {
               )
             )
           }
+          Text("停用后不参与全部刷新、推荐账号和桌面小组件，但仍保留在账号列表，可单独刷新或重新启用。")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
         }
       }
       .scrollContentBackground(.hidden)
       .background(selectedTheme.background)
       .navigationTitle("设置")
+      .alert("清除走势历史？", isPresented: $confirmingHistoryClear) {
+        Button("取消", role: .cancel) {}
+        Button("清除", role: .destructive) {
+          Task { await model.clearUsageHistory() }
+        }
+      } message: {
+        Text("只会删除本机统计记录，不会删除账号或登录凭据。")
+      }
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("完成") { dismiss() }
@@ -816,6 +1056,9 @@ struct SettingsView: View {
           WidgetCenter.shared.reloadAllTimelines()
         }
       }
+      .onChange(of: aggregateHistory) { enabled in
+        Task { await SharedStore.shared.setAggregateHistory(enabled) }
+      }
     }
     .environment(\.dashboardTheme, selectedTheme)
     .preferredColorScheme(selectedTheme.preferredColorScheme)
@@ -828,8 +1071,8 @@ private struct ThemePreviewRow: View {
   var body: some View {
     HStack(spacing: 12) {
       HStack(spacing: 5) {
-        ForEach(Array(theme.previewColors.enumerated()), id: \.offset) { _, color in
-          Circle().fill(color).frame(width: 16, height: 16)
+        ForEach(Array(theme.previewColors.enumerated()), id: \.offset) { item in
+          Circle().fill(item.element).frame(width: 16, height: 16)
         }
       }
       VStack(alignment: .leading, spacing: 2) {

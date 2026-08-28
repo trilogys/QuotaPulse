@@ -32,12 +32,12 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: $(AIQUOTA_APP_BUNDLE_ID)
         CODE_SIGN_ENTITLEMENTS: AIQuotaApp/AIQuotaApp.entitlements
         PROVISIONING_PROFILE_SPECIFIER: $(AIQUOTA_APP_PROFILE_SPECIFIER)
-        INFOPLIST_KEY_CFBundleDisplayName: AI Quota
+        INFOPLIST_KEY_CFBundleDisplayName: QuotaPulse
         INFOPLIST_KEY_AIQuotaAppGroup: $(AIQUOTA_APP_GROUP)
         INFOPLIST_KEY_AIQuotaKeychainSuffix: $(AIQUOTA_KEYCHAIN_SUFFIX)
         INFOPLIST_KEY_UILaunchScreen_Generation: true
         GENERATE_INFOPLIST_FILE: true
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: AIQuotaApp/Info.plist
       properties:
@@ -57,7 +57,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: $(AIQUOTA_WIDGET_BUNDLE_ID)
         CODE_SIGN_ENTITLEMENTS: AIQuotaWidget/AIQuotaWidget.entitlements
         PROVISIONING_PROFILE_SPECIFIER: $(AIQUOTA_WIDGET_PROFILE_SPECIFIER)
-        INFOPLIST_KEY_CFBundleDisplayName: AI Quota Widget
+        INFOPLIST_KEY_CFBundleDisplayName: QuotaPulse Widget
         INFOPLIST_KEY_AIQuotaAppGroup: $(AIQUOTA_APP_GROUP)
         INFOPLIST_KEY_AIQuotaKeychainSuffix: $(AIQUOTA_KEYCHAIN_SUFFIX)
         GENERATE_INFOPLIST_FILE: true

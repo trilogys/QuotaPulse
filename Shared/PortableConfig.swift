@@ -42,7 +42,7 @@ enum PortableConfigError: LocalizedError {
   case invalidFormat
   case unsupportedVersion(Int)
   case invalidProvider(String)
-  var errorDescription:String? { switch self { case .invalidFormat:"不是 AI Quota 配置文件";case .unsupportedVersion(let v):"暂不支持配置版本 \(v)";case .invalidProvider(let p):"未知 Provider：\(p)" } }
+  var errorDescription:String? { switch self { case .invalidFormat:"不是 QuotaPulse 配置文件";case .unsupportedVersion(let v):"暂不支持配置版本 \(v)";case .invalidProvider(let p):"未知 Provider：\(p)" } }
 }
 
 struct PortableConfigCodec {
