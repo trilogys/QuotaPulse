@@ -9,6 +9,7 @@ struct AIQuotaEntry: TimelineEntry {
   let cooldowns: [UUID: Date]
   let lastAttemptAt: Date
   let credentialAccessIssue: String?
+  let theme: DashboardTheme
 }
 
 private enum WidgetEntryLoader {
@@ -28,7 +29,8 @@ private enum WidgetEntryLoader {
       selectedAccountIDs: [account.id],
       cooldowns: [:],
       lastAttemptAt: .now,
-      credentialAccessIssue: nil
+      credentialAccessIssue: nil,
+      theme: .neon
     )
   }
 
@@ -53,13 +55,15 @@ private enum WidgetEntryLoader {
     case .unavailable(let reason):
       issue = reason
     }
+    let theme = await SharedStore.shared.dashboardTheme()
     return AIQuotaEntry(
       date: .now,
       items: items,
       selectedAccountIDs: accounts.map(\.id),
       cooldowns: cooldowns,
       lastAttemptAt: .now,
-      credentialAccessIssue: issue
+      credentialAccessIssue: issue,
+      theme: theme
     )
   }
 
@@ -155,10 +159,12 @@ struct AIQuotaWidgetView: View {
       content
         .containerBackground(for: .widget) { background }
         .widgetURL(URL(string: "aiquota://accounts"))
+        .environment(\.colorScheme, entry.theme.preferredColorScheme)
     } else {
       content
         .background(background)
         .widgetURL(URL(string: "aiquota://accounts"))
+        .environment(\.colorScheme, entry.theme.preferredColorScheme)
     }
   }
 
@@ -180,8 +186,8 @@ struct AIQuotaWidgetView: View {
   private var background: some View {
     LinearGradient(
       colors: [
-        Color(red: 0.035, green: 0.04, blue: 0.055),
-        Color(red: 0.075, green: 0.055, blue: 0.13),
+        entry.theme.background,
+        entry.theme.backgroundAccent,
       ],
       startPoint: .topLeading,
       endPoint: .bottomTrailing
@@ -231,13 +237,13 @@ struct AIQuotaWidgetView: View {
 
   private var livePill: some View {
     HStack(spacing: 4) {
-      Circle().fill(Color.green).frame(width: 5, height: 5)
+      Circle().fill(entry.theme.success).frame(width: 5, height: 5)
       Text("LIVE").font(.system(size: 8, weight: .bold))
     }
-    .foregroundStyle(.green)
+    .foregroundStyle(entry.theme.success)
     .padding(.horizontal, 7)
     .frame(height: 23)
-    .background(Color.green.opacity(0.12), in: Capsule())
+    .background(entry.theme.success.opacity(0.12), in: Capsule())
   }
 
   private func signingState(_ reason: String) -> some View {
@@ -270,7 +276,7 @@ struct AIQuotaWidgetView: View {
   @ViewBuilder private func accountRow(_ item: WidgetDisplayItem) -> some View {
     HStack(spacing: 8) {
       Capsule()
-        .fill(providerColor(item.account.provider))
+        .fill(entry.theme.accent(for: item.account.provider))
         .frame(width: 3)
       VStack(alignment: .leading, spacing: 4) {
         HStack(spacing: 5) {
@@ -297,8 +303,8 @@ struct AIQuotaWidgetView: View {
     }
     .padding(.horizontal, 8)
     .padding(.vertical, family == .systemSmall ? 6 : 7)
-    .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 6))
-    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.10), lineWidth: 1))
+    .background(entry.theme.surface, in: RoundedRectangle(cornerRadius: 6))
+    .overlay(RoundedRectangle(cornerRadius: 6).stroke(entry.theme.border, lineWidth: 1))
   }
 
   @available(iOS 17.0, *)
@@ -325,7 +331,7 @@ struct AIQuotaWidgetView: View {
         Text("余额").foregroundStyle(.secondary)
         Text("\(balance.symbol)\(balance.total, specifier: "%.2f")")
           .fontWeight(.bold)
-          .foregroundStyle(providerColor(provider))
+          .foregroundStyle(entry.theme.accent(for: provider))
         if !balance.available { Text("不可用").foregroundStyle(.red) }
       }
       .font(.system(size: 10))
@@ -416,19 +422,7 @@ struct AIQuotaWidgetView: View {
   private func progressColor(_ remaining: Double, provider: ProviderID) -> Color {
     if remaining <= 15 { return .red }
     if remaining <= 35 { return .orange }
-    return providerColor(provider)
-  }
-
-  private func providerColor(_ provider: ProviderID) -> Color {
-    switch provider {
-    case .codex: Color(red: 0.49, green: 0.20, blue: 0.96)
-    case .claude: Color(red: 0.94, green: 0.39, blue: 0.18)
-    case .kimi: Color(red: 0.20, green: 0.78, blue: 0.45)
-    case .deepseek: Color(red: 0.25, green: 0.82, blue: 0.80)
-    case .minimax: Color(red: 0.95, green: 0.65, blue: 0.18)
-    case .glm: Color(red: 0.30, green: 0.53, blue: 0.98)
-    case .copilot: Color(red: 0.78, green: 0.45, blue: 0.92)
-    }
+    return entry.theme.accent(for: provider)
   }
 }
 
