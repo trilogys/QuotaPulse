@@ -69,7 +69,7 @@ Codex 使用 browser OAuth + PKCE + iPhone 本机 localhost callback；日常刷
 AIQuota-iOS-resign
 ├─ AIQuota-resign.ipa
 ├─ AIQuota-unsigned.ipa
-├─ AIQuota-app-only-resign.ipa
+├─ QuotaPulse.ipa
 ├─ AIQuota-app-only-unsigned.ipa
 ├─ SHA256
 └─ signing-info
@@ -78,7 +78,7 @@ AIQuota-signed-release-testing / debugging
 └─ AIQuota-signed.ipa
 ```
 
-只有 P12/一套描述文件，或使用全能签、爱思助手等兼容性不明确的工具时，优先使用 `AIQuota-app-only-resign.ipa`。它不包含 Widget Extension，不要求 App Group，只需正确签名主 App。
+只有 P12/一套描述文件，或使用全能签、爱思助手等兼容性不明确的工具时，优先使用 `QuotaPulse.ipa`。它不包含 Widget Extension，不要求 App Group，只需正确签名主 App。
 
 `AIQuota-resign.ipa` 是包含 Widget 的标准 IPA。包内真实包含：
 

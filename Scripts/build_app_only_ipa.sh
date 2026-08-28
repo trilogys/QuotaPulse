@@ -70,7 +70,7 @@ mkdir -p "$STAGE/Payload"
 ditto "$APP" "$STAGE/Payload/AIQuota.app"
 
 IPA="$ROOT/$OUT_DIR/AIQuota-app-only-unsigned.ipa"
-RESIGN_IPA="$ROOT/$OUT_DIR/AIQuota-app-only-resign.ipa"
+RESIGN_IPA="$ROOT/$OUT_DIR/QuotaPulse.ipa"
 (
   cd "$STAGE"
   /usr/bin/zip -qry "$IPA" Payload
@@ -100,6 +100,6 @@ INFO
 (
   cd "$ROOT/$OUT_DIR"
   shasum -a 256 AIQuota-app-only-unsigned.ipa > AIQuota-app-only-unsigned.ipa.sha256
-  shasum -a 256 AIQuota-app-only-resign.ipa > AIQuota-app-only-resign.ipa.sha256
+  shasum -a 256 QuotaPulse.ipa > QuotaPulse.ipa.sha256
 )
 printf '\nApp-only unsigned IPA: %s\nApp-only re-sign IPA: %s\n' "$IPA" "$RESIGN_IPA"

@@ -22,7 +22,7 @@ Artifact 包含：
 - `AIQuota-unsigned.ipa` — 与 resign 版内容相同的通用命名
 - `AIQuota-unsigned.ipa.sha256`
 - `AIQuota-unsigned-signing-info.txt`
-- `AIQuota-app-only-resign.ipa` — **单 App 兼容版，优先用于全能签/爱思助手**
+- `QuotaPulse.ipa` — **单 App 兼容版，优先用于全能签/爱思助手**
 - `AIQuota-app-only-unsigned.ipa`
 - `AIQuota-app-only-signing-info.txt`
 
@@ -30,7 +30,7 @@ Artifact 包含：
 
 ```text
 只有 P12 + 一份主 App profile
-  → AIQuota-app-only-resign.ipa
+  → QuotaPulse.ipa
   → 在签名工具中导入 P12、密码和 profile
   → 签名后安装
 
@@ -77,7 +77,7 @@ QuotaPulse 使用标准 IPA 结构，因此可以作为爱思助手等桌面签�
 4. 两个 profile 是否允许对应 App Group；
 5. 主 App / Widget bundle ID 是否与 profile 匹配。
 
-> QuotaPulse 不依赖某个私有签名工具的特殊格式；它输出的是标准 IPA。若工具不能处理 Extension，请改用 `AIQuota-app-only-resign.ipa`。
+> QuotaPulse 不依赖某个私有签名工具的特殊格式；它输出的是标准 IPA。若工具不能处理 Extension，请改用 `QuotaPulse.ipa`。
 
 ## 3. P12 + mobileprovision signed IPA
 
@@ -175,7 +175,7 @@ unsigned IPA 无法预先知道最终 Apple application-identifier prefix，所�
 
 ```text
 只有一份主 App profile / 不需要小组件
-        → AIQuota-app-only-resign.ipa
+        → QuotaPulse.ipa
         → 全能签或爱思助手导入 P12 + profile 后签名安装
 
 已有 P12 + 主 App profile + Widget profile
@@ -186,7 +186,7 @@ unsigned IPA 无法预先知道最终 Apple application-identifier prefix，所�
 如果只有 P12 + 一份主 App profile，并习惯使用手机签名工具：
 
 ```text
-Actions 下载 AIQuota-app-only-resign.ipa
+Actions 下载 QuotaPulse.ipa
         → 全能签 / ESign
         → 签名主 App
         → 安装
@@ -195,7 +195,7 @@ Actions 下载 AIQuota-app-only-resign.ipa
 如果使用爱思助手：
 
 ```text
-Actions 下载 AIQuota-app-only-resign.ipa
+Actions 下载 QuotaPulse.ipa
         → 爱思助手签名/安装
         → 安装并在 App 内刷新
 ```

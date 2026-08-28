@@ -114,19 +114,19 @@ enum Sub2APIConfigCodec {
     let platform = string(raw, keys: ["platform"])?.lowercased()
     let type = string(raw, keys: ["type"])?.lowercased()
     switch (platform, type) {
-    case ("openai", "oauth"): .codex
-    case ("openai", "api-key"), ("openai", "apikey"), ("openai", "key"): .codex
-    case ("anthropic", "oauth"), ("anthropic", "setup-token"): .claude
-    case ("anthropic", "api-key"), ("anthropic", "apikey"), ("anthropic", "key"): .claude
-    case ("kimi", "api-key"), ("kimi", "apikey"), ("moonshot", "api-key"), ("moonshot", "apikey"): .kimi
-    default: nil
+    case ("openai", "oauth"): return .codex
+    case ("openai", "api-key"), ("openai", "apikey"), ("openai", "key"): return .codex
+    case ("anthropic", "oauth"), ("anthropic", "setup-token"): return .claude
+    case ("anthropic", "api-key"), ("anthropic", "apikey"), ("anthropic", "key"): return .claude
+    case ("kimi", "api-key"), ("kimi", "apikey"), ("moonshot", "api-key"), ("moonshot", "apikey"): return .kimi
+    default: return nil
     }
   }
 
   private static func authenticationMode(_ raw: [String: Any]) -> CredentialAuthenticationMode {
     switch string(raw, keys: ["type"])?.lowercased() {
-    case "api-key", "apikey", "key": .apiKey
-    default: .oauth
+    case "api-key", "apikey", "key": return .apiKey
+    default: return .oauth
     }
   }
 

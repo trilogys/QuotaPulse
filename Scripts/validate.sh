@@ -38,7 +38,7 @@ loopback=Path('AIQuotaApp/LoopbackOAuthServer.swift').read_text(encoding='utf-8'
 sub2api=Path('Shared/Sub2APIConfigImport.swift').read_text(encoding='utf-8')
 assert 'case http' in proxy and 'case socks5' in proxy
 assert 'connectionProxyDictionary' in http and 'ProxyAuthenticationDelegate' in http
-assert all(value in proxy for value in ['socket', 'socks5://', 'kCFNetworkProxiesSOCKSEnable', 'kCFProxyUsernameKey'])
+assert all(value in proxy for value in ['socket', 'socks5://', 'SOCKSEnable', 'SOCKSProxy', 'SOCKSUser'])
 assert all(value in proxy for value in ['AppProxyProfile', 'AppProxyTarget', 'legacyID'])
 assert all(value in store for value in ['proxyProfiles', 'activeProxyProfile', 'setProxyProfileActive'])
 assert 'profileID' in ks
@@ -110,6 +110,8 @@ grep -q '#include? "SigningConfig.xcconfig"' Config.xcconfig
 grep -q 'build_type:' .github/workflows/ipa.yml
 grep -q 'AIQuota-unsigned.ipa' .github/workflows/ipa.yml
 grep -q 'AIQuota-signed.ipa' .github/workflows/ipa.yml
+grep -q 'build/app-only-export/QuotaPulse.ipa' .github/workflows/ipa.yml
+grep -q 'RESIGN_IPA="$ROOT/$OUT_DIR/QuotaPulse.ipa"' Scripts/build_app_only_ipa.sh
 grep -q 'build_app_only_ipa.sh' .github/workflows/ipa.yml
 grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 16.0' Config.xcconfig
 grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 16.0' Config.single-profile.xcconfig

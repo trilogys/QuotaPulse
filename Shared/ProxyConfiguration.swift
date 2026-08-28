@@ -70,23 +70,25 @@ struct AppProxyConfiguration: Codable, Equatable, Sendable {
       return nil
     case .http:
       values = [
-        kCFNetworkProxiesHTTPEnable as String: true,
-        kCFNetworkProxiesHTTPProxy as String: normalizedHost,
-        kCFNetworkProxiesHTTPPort as String: port,
-        kCFNetworkProxiesHTTPSEnable as String: true,
-        kCFNetworkProxiesHTTPSProxy as String: normalizedHost,
-        kCFNetworkProxiesHTTPSPort as String: port,
+        "HTTPEnable": true,
+        "HTTPProxy": normalizedHost,
+        "HTTPPort": port,
+        "HTTPSEnable": true,
+        "HTTPSProxy": normalizedHost,
+        "HTTPSPort": port,
       ]
     case .socks5:
       values = [
-        kCFNetworkProxiesSOCKSEnable as String: true,
-        kCFNetworkProxiesSOCKSProxy as String: normalizedHost,
-        kCFNetworkProxiesSOCKSPort as String: port,
+        "SOCKSEnable": true,
+        "SOCKSProxy": normalizedHost,
+        "SOCKSPort": port,
       ]
     }
     if !username.isEmpty {
-      values[kCFProxyUsernameKey as String] = username
-      values[kCFProxyPasswordKey as String] = password
+      values["ProxyUsername"] = username
+      values["ProxyPassword"] = password
+      values["SOCKSUser"] = username
+      values["SOCKSPassword"] = password
     }
     return values
   }

@@ -101,8 +101,8 @@ jobs:
             build/unsigned-export/AIQuota-unsigned-signing-info.txt
             build/app-only-export/AIQuota-app-only-unsigned.ipa
             build/app-only-export/AIQuota-app-only-unsigned.ipa.sha256
-            build/app-only-export/AIQuota-app-only-resign.ipa
-            build/app-only-export/AIQuota-app-only-resign.ipa.sha256
+            build/app-only-export/QuotaPulse.ipa
+            build/app-only-export/QuotaPulse.ipa.sha256
             build/app-only-export/AIQuota-app-only-signing-info.txt
           if-no-files-found: error
           retention-days: 14
