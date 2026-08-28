@@ -29,6 +29,7 @@ class CredentialStore(context: Context) {
             .put("clientId", credential.clientId)
             .put("idToken", credential.idToken)
             .put("baseUrl", credential.baseUrl)
+            .put("authenticationMode", credential.authenticationMode?.name)
             .put("deviceHeaders", headers)
         prefs.edit().putString(accountId, json.toString()).apply()
     }
@@ -54,7 +55,9 @@ class CredentialStore(context: Context) {
             clientId = json.optString("clientId").takeIf { it.isNotBlank() && it != "null" },
             idToken = json.optString("idToken").takeIf { it.isNotBlank() && it != "null" },
             deviceHeaders = headers,
-            baseUrl = json.optString("baseUrl").takeIf { it.isNotBlank() && it != "null" }
+            baseUrl = json.optString("baseUrl").takeIf { it.isNotBlank() && it != "null" },
+            authenticationMode = json.optString("authenticationMode").takeIf { it.isNotBlank() && it != "null" }
+                ?.let { runCatching { CredentialAuthenticationMode.valueOf(it) }.getOrNull() }
         )
     }
 

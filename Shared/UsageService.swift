@@ -35,6 +35,17 @@ actor UsageService {
     let candidates: [CodexResetCreditCandidate]
   }
 
+  private struct CodexModelUsageKey: Hashable {
+    let model: String
+    let reasoningEffort: String?
+    let speed: String?
+  }
+
+  private struct OpenAIAdminUsagePayload {
+    let tokenUsage: CodexTokenUsageSummary
+    let modelUsage: CodexModelUsageSummary
+  }
+
   @discardableResult
   func refresh(accountID: UUID) async throws -> UsageSnapshot {
     guard let account = await SharedStore.shared.account(id: accountID) else { throw UsageError.missingAccount }
@@ -74,6 +85,9 @@ actor UsageService {
     guard var credential = try keychain.credential(accountID: accountID) else {
       throw UsageError.missingCredential
     }
+    guard credential.authenticationMode != .apiKey else {
+      throw UsageError.invalidResponse("Codex reset credits require ChatGPT OAuth")
+    }
     let payload = try await fetchCodexResetCreditPayload(account: account, credential: &credential)
     var snapshot = await SharedStore.shared.snapshot(for: accountID)
       ?? UsageSnapshot(accountID: accountID, provider: .codex)
@@ -90,6 +104,9 @@ actor UsageService {
       throw UsageError.missingCredential
     }
 
+    guard credential.authenticationMode != .apiKey else {
+      throw UsageError.invalidResponse("Codex quota reset requires ChatGPT OAuth")
+    }
     let payload = try await fetchCodexResetCreditPayload(account: account, credential: &credential)
     guard payload.summary.availableCount > 0 else {
       throw UsageError.invalidResponse("No Codex reset credits available")
@@ -140,6 +157,27 @@ actor UsageService {
     )
   }
 
+  func queryCodexModelUsage(accountID: UUID) async throws -> CodexModelUsageSummary {
+    guard let account = await SharedStore.shared.account(id: accountID), account.provider == .codex else {
+      throw UsageError.missingAccount
+    }
+    guard var credential = try keychain.credential(accountID: accountID) else {
+      throw UsageError.missingCredential
+    }
+    guard credential.authenticationMode != .apiKey else {
+      throw UsageError.invalidResponse("Codex thread usage requires ChatGPT OAuth")
+    }
+    let summary = try await fetchCodexModelUsage(
+      account: account,
+      credential: &credential
+    )
+    var snapshot = await SharedStore.shared.snapshot(for: accountID)
+      ?? UsageSnapshot(accountID: accountID, provider: .codex)
+    snapshot.codexModelUsage = summary
+    await SharedStore.shared.saveSnapshot(snapshot)
+    return summary
+  }
+
   private func fetch(account: AccountRecord) async throws -> UsageSnapshot {
     guard var credential = try keychain.credential(accountID: account.id) else { throw UsageError.missingCredential }
     switch account.provider {
@@ -154,6 +192,9 @@ actor UsageService {
   }
 
   private func fetchCodex(account: AccountRecord, credential: inout Credential) async throws -> UsageSnapshot {
+    if credential.authenticationMode == .apiKey {
+      return try await fetchOpenAIAPIKey(account: account, credential: credential)
+    }
     func call(_ credential: Credential) async throws -> HTTPResult {
       try await http.send(
         URL(string: "https://chatgpt.com/backend-api/wham/usage")!,
@@ -185,7 +226,268 @@ actor UsageService {
       let cached = await SharedStore.shared.snapshot(for: account.id)
       resetCredits = cached?.codexResetCredits
     }
-    return UsageSnapshot(accountID: account.id, provider: .codex, windows: windows, codexResetCredits: resetCredits)
+    let cachedSnapshot = await SharedStore.shared.snapshot(for: account.id)
+    let cachedTokenUsage = cachedSnapshot?.codexTokenUsage
+    let tokenUsage = (try? await fetchCodexTokenUsage(credential: credential)) ?? cachedTokenUsage
+    return UsageSnapshot(
+      accountID: account.id,
+      provider: .codex,
+      windows: windows,
+      codexResetCredits: resetCredits,
+      codexTokenUsage: tokenUsage,
+      codexModelUsage: cachedSnapshot?.codexModelUsage,
+      authenticationMode: .oauth
+    )
+  }
+
+  private func fetchOpenAIAPIKey(
+    account: AccountRecord,
+    credential: Credential
+  ) async throws -> UsageSnapshot {
+    let base = apiV1BaseURL(credential.baseURL, fallback: "https://api.openai.com")
+    let result = try await http.send(
+      URL(string: "\(base)/models")!,
+      headers: ["Authorization": "Bearer \(credential.accessToken)", "Accept": "application/json"]
+    )
+    guard (200..<300).contains(result.statusCode) else {
+      throw UsageError.http(result.statusCode, String(data: result.data, encoding: .utf8) ?? "")
+    }
+    let root = try result.jsonDictionary()
+    let modelCount = (root["data"] as? [[String: Any]])?.count ?? 0
+    let adminUsage = try? await fetchOpenAIAdminUsage(base: base, credential: credential)
+    return UsageSnapshot(
+      accountID: account.id,
+      provider: .codex,
+      metrics: [
+        UsageMetric(label: "认证", value: "API Key"),
+        UsageMetric(label: "可用模型", value: "\(modelCount)"),
+      ],
+      codexTokenUsage: adminUsage?.tokenUsage,
+      codexModelUsage: adminUsage?.modelUsage,
+      authenticationMode: .apiKey,
+      plan: "OpenAI API"
+    )
+  }
+
+  private func fetchOpenAIAdminUsage(
+    base: String,
+    credential: Credential
+  ) async throws -> OpenAIAdminUsagePayload? {
+    var components = URLComponents(string: "\(base)/organization/usage/completions")!
+    components.queryItems = [
+      URLQueryItem(name: "start_time", value: "\(Int(Date().addingTimeInterval(-30 * 86_400).timeIntervalSince1970))"),
+      URLQueryItem(name: "bucket_width", value: "1d"),
+      URLQueryItem(name: "limit", value: "31"),
+      URLQueryItem(name: "group_by", value: "model"),
+    ]
+    guard let url = components.url else { return nil }
+    let result = try await http.send(
+      url,
+      headers: ["Authorization": "Bearer \(credential.accessToken)", "Accept": "application/json"],
+      timeout: 20
+    )
+    guard (200..<300).contains(result.statusCode) else { return nil }
+    let root = try result.jsonDictionary()
+    let buckets = (root["data"] as? [[String: Any]]) ?? []
+    var daily: [CodexDailyTokenUsage] = []
+    var groups: [CodexModelUsageKey: CodexModelTokenUsage] = [:]
+    var requestCount: Int64 = 0
+    for bucket in buckets {
+      guard let start = int64(bucket["start_time"]) else { continue }
+      let results = (bucket["results"] as? [[String: Any]]) ?? []
+      var dailyTotal: Int64 = 0
+      for raw in results {
+        let input = int64(raw["input_tokens"]) ?? 0
+        let cached = int64(raw["input_cached_tokens"]) ?? 0
+        let output = int64(raw["output_tokens"]) ?? 0
+        let total = input + output
+        dailyTotal += total
+        requestCount += int64(raw["num_model_requests"]) ?? 0
+        let key = CodexModelUsageKey(
+          model: string(raw["model"]) ?? "未分组模型",
+          reasoningEffort: nil,
+          speed: string(raw["service_tier"])
+        )
+        let current = groups[key] ?? CodexModelTokenUsage(
+          model: key.model,
+          reasoningEffort: nil,
+          speed: key.speed,
+          inputTokens: 0,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          estimatedUsageCreditsMicros: 0
+        )
+        groups[key] = CodexModelTokenUsage(
+          model: current.model,
+          reasoningEffort: current.reasoningEffort,
+          speed: current.speed,
+          inputTokens: current.inputTokens + input,
+          cachedInputTokens: current.cachedInputTokens + cached,
+          outputTokens: current.outputTokens + output,
+          totalTokens: current.totalTokens + total,
+          estimatedUsageCreditsMicros: 0
+        )
+      }
+      daily.append(CodexDailyTokenUsage(
+        startDate: Date(timeIntervalSince1970: TimeInterval(start)),
+        tokens: dailyTotal
+      ))
+    }
+    let tokenUsage = CodexTokenUsageSummary(
+      lifetimeTokens: nil,
+      peakDailyTokens: daily.map(\.tokens).max(),
+      longestRunningTurnSeconds: nil,
+      currentStreakDays: nil,
+      longestStreakDays: nil,
+      dailyUsageBuckets: daily.sorted { $0.startDate < $1.startDate }
+    )
+    guard tokenUsage.hasData || !groups.isEmpty else { return nil }
+    return OpenAIAdminUsagePayload(
+      tokenUsage: tokenUsage,
+      modelUsage: CodexModelUsageSummary(
+        groups: groups.values.sorted { $0.totalTokens > $1.totalTokens },
+        returnedThreadCount: Int(requestCount),
+        estimatedUsageUSDMicros: nil,
+        isPartial: bool(root["has_more"]) ?? false,
+        fetchedAt: .now
+      )
+    )
+  }
+
+  private func fetchCodexTokenUsage(credential: Credential) async throws -> CodexTokenUsageSummary? {
+    let result = try await http.send(
+      URL(string: "https://chatgpt.com/backend-api/wham/profiles/me")!,
+      headers: codexQuotaHeaders(credential),
+      timeout: 20
+    )
+    guard (200..<300).contains(result.statusCode) else {
+      throw UsageError.http(result.statusCode, String(data: result.data, encoding: .utf8) ?? "")
+    }
+    let root = try result.jsonDictionary()
+    let profile = dictionary(root["profile"]) ?? root
+    let stats = dictionary(profile["stats"])
+      ?? dictionary(root["summary"])
+      ?? profile
+    let rawBuckets = (stats["daily_usage_buckets"] as? [[String: Any]])
+      ?? (stats["dailyUsageBuckets"] as? [[String: Any]])
+      ?? (root["dailyUsageBuckets"] as? [[String: Any]])
+      ?? []
+    let buckets = rawBuckets.compactMap { item -> CodexDailyTokenUsage? in
+      let dateValue = string(item["start_date"] ?? item["startDate"])
+      guard let startDate = parseCodexDay(dateValue),
+            let tokens = int64(item["tokens"]) else { return nil }
+      return CodexDailyTokenUsage(startDate: startDate, tokens: max(0, tokens))
+    }.sorted { $0.startDate < $1.startDate }
+    let summary = CodexTokenUsageSummary(
+      lifetimeTokens: int64(stats["lifetime_tokens"] ?? stats["lifetimeTokens"]),
+      peakDailyTokens: int64(stats["peak_daily_tokens"] ?? stats["peakDailyTokens"]),
+      longestRunningTurnSeconds: int64(stats["longest_running_turn_sec"] ?? stats["longestRunningTurnSec"]),
+      currentStreakDays: int64(stats["current_streak_days"] ?? stats["currentStreakDays"]),
+      longestStreakDays: int64(stats["longest_streak_days"] ?? stats["longestStreakDays"]),
+      dailyUsageBuckets: buckets
+    )
+    return summary.hasData ? summary : nil
+  }
+
+  private func fetchCodexModelUsage(
+    account: AccountRecord,
+    credential: inout Credential
+  ) async throws -> CodexModelUsageSummary {
+    func listTasks(_ credential: Credential) async throws -> HTTPResult {
+      try await http.send(
+        URL(string: "https://chatgpt.com/backend-api/wham/tasks?limit=50")!,
+        headers: codexQuotaHeaders(credential),
+        timeout: 20
+      )
+    }
+    var taskResult = try await listTasks(credential)
+    if taskResult.statusCode == 401, credential.refreshToken != nil {
+      credential = try await refreshCodexCredential(credential, accountID: account.id)
+      taskResult = try await listTasks(credential)
+    }
+    guard (200..<300).contains(taskResult.statusCode) else {
+      throw UsageError.http(taskResult.statusCode, String(data: taskResult.data, encoding: .utf8) ?? "")
+    }
+    let taskRoot = try taskResult.jsonDictionary()
+    let taskItems = (taskRoot["items"] as? [[String: Any]])
+      ?? (taskRoot["data"] as? [[String: Any]])
+      ?? []
+    let threadIDs = taskItems.compactMap { string($0["thread_id"] ?? $0["threadId"] ?? $0["id"]) }
+    guard !threadIDs.isEmpty else {
+      throw UsageError.invalidResponse("No Codex cloud tasks returned")
+    }
+
+    var groups: [CodexModelUsageKey: CodexModelTokenUsage] = [:]
+    var returnedThreadCount = 0
+    var totalUSDMicros: Int64?
+    for start in stride(from: 0, to: threadIDs.count, by: 20) {
+      let ids = Array(threadIDs[start..<min(start + 20, threadIDs.count)])
+      let body = try JSONSerialization.data(withJSONObject: ["thread_ids": ids])
+      var headers = codexQuotaHeaders(credential)
+      headers["Content-Type"] = "application/json"
+      let result = try await http.send(
+        URL(string: "https://chatgpt.com/backend-api/wham/usage/thread_usage/query")!,
+        method: "POST",
+        headers: headers,
+        body: body,
+        timeout: 25
+      )
+      guard (200..<300).contains(result.statusCode) else {
+        throw UsageError.http(result.statusCode, String(data: result.data, encoding: .utf8) ?? "")
+      }
+      let root = try result.jsonDictionary()
+      let threads = (root["threads"] as? [[String: Any]]) ?? []
+      returnedThreadCount += threads.count
+      for thread in threads {
+        if let usd = int64(thread["estimated_usage_usd_micros"] ?? thread["estimatedUsageUsdMicros"]) {
+          totalUSDMicros = (totalUSDMicros ?? 0) + usd
+        }
+        let rawGroups = (thread["groups"] as? [[String: Any]]) ?? []
+        for raw in rawGroups {
+          let key = CodexModelUsageKey(
+            model: string(raw["model"]) ?? "未知模型",
+            reasoningEffort: string(raw["reasoning_effort"] ?? raw["reasoningEffort"]),
+            speed: string(raw["speed"])
+          )
+          let input = int64(raw["input_tokens"] ?? raw["inputTokens"]) ?? 0
+          let cached = int64(raw["cached_input_tokens"] ?? raw["cachedInputTokens"]) ?? 0
+          let output = int64(raw["output_tokens"] ?? raw["outputTokens"]) ?? 0
+          let total = int64(raw["total_tokens"] ?? raw["totalTokens"]) ?? (input + output)
+          let credits = int64(raw["estimated_usage_credits_micros"] ?? raw["estimatedUsageCreditsMicros"]) ?? 0
+          let current = groups[key] ?? CodexModelTokenUsage(
+            model: key.model,
+            reasoningEffort: key.reasoningEffort,
+            speed: key.speed,
+            inputTokens: 0,
+            cachedInputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            estimatedUsageCreditsMicros: 0
+          )
+          groups[key] = CodexModelTokenUsage(
+            model: current.model,
+            reasoningEffort: current.reasoningEffort,
+            speed: current.speed,
+            inputTokens: current.inputTokens + input,
+            cachedInputTokens: current.cachedInputTokens + cached,
+            outputTokens: current.outputTokens + output,
+            totalTokens: current.totalTokens + total,
+            estimatedUsageCreditsMicros: current.estimatedUsageCreditsMicros + credits
+          )
+        }
+      }
+    }
+    guard returnedThreadCount > 0 else {
+      throw UsageError.invalidResponse("Codex did not return thread usage")
+    }
+    return CodexModelUsageSummary(
+      groups: groups.values.sorted { $0.totalTokens > $1.totalTokens },
+      returnedThreadCount: returnedThreadCount,
+      estimatedUsageUSDMicros: totalUSDMicros,
+      isPartial: string(taskRoot["cursor"] ?? taskRoot["next_cursor"] ?? taskRoot["nextCursor"]) != nil,
+      fetchedAt: .now
+    )
   }
 
   private func fetchCodexResetCreditPayload(
@@ -287,6 +589,9 @@ actor UsageService {
   }
 
   private func fetchClaude(account: AccountRecord, credential: inout Credential) async throws -> UsageSnapshot {
+    if credential.authenticationMode == .apiKey {
+      return try await fetchClaudeAPIKey(account: account, credential: credential)
+    }
     if let expires = credential.expiresAt, expires.timeIntervalSinceNow < 60, credential.refreshToken != nil { credential = try await refreshClaudeCredential(credential, accountID: account.id) }
     func call(_ credential: Credential) async throws -> HTTPResult { try await http.send(URL(string: "https://api.anthropic.com/api/oauth/usage")!, headers: ["Authorization": "Bearer \(credential.accessToken)", "anthropic-beta": "oauth-2025-04-20", "User-Agent": "claude-cli", "Accept": "application/json"]) }
     var result = try await call(credential)
@@ -296,7 +601,34 @@ actor UsageService {
     if let five = dictionary(root["five_hour"]) { windows.append(UsageWindow(id: "claude-5h", label: "5h", remainingPercent: 100 - (number(five["utilization"]) ?? 0), resetAt: parseISODate(string(five["resets_at"])))) }
     if let seven = dictionary(root["seven_day"]) { windows.append(UsageWindow(id: "claude-week", label: "周", remainingPercent: 100 - (number(seven["utilization"]) ?? 0), resetAt: parseISODate(string(seven["resets_at"])))) }
     guard !windows.isEmpty else { throw UsageError.invalidResponse("No Claude quota windows") }
-    return UsageSnapshot(accountID: account.id, provider: .claude, windows: windows)
+    return UsageSnapshot(accountID: account.id, provider: .claude, windows: windows, authenticationMode: .oauth)
+  }
+
+  private func fetchClaudeAPIKey(account: AccountRecord, credential: Credential) async throws -> UsageSnapshot {
+    let base = apiV1BaseURL(credential.baseURL, fallback: "https://api.anthropic.com")
+    let result = try await http.send(
+      URL(string: "\(base)/models")!,
+      headers: [
+        "x-api-key": credential.accessToken,
+        "anthropic-version": "2023-06-01",
+        "Accept": "application/json",
+      ]
+    )
+    guard (200..<300).contains(result.statusCode) else {
+      throw UsageError.http(result.statusCode, String(data: result.data, encoding: .utf8) ?? "")
+    }
+    let root = try result.jsonDictionary()
+    let modelCount = (root["data"] as? [[String: Any]])?.count ?? 0
+    return UsageSnapshot(
+      accountID: account.id,
+      provider: .claude,
+      metrics: [
+        UsageMetric(label: "认证", value: "API Key"),
+        UsageMetric(label: "可用模型", value: "\(modelCount)"),
+      ],
+      authenticationMode: .apiKey,
+      plan: "Anthropic API"
+    )
   }
 
   private func refreshClaudeCredential(_ credential: Credential, accountID: UUID) async throws -> Credential {
@@ -309,6 +641,9 @@ actor UsageService {
   }
 
   private func fetchKimi(account: AccountRecord, credential: inout Credential) async throws -> UsageSnapshot {
+    if credential.authenticationMode == .apiKey {
+      return try await fetchKimiAPIKey(account: account, credential: credential)
+    }
     if let expires = credential.expiresAt, expires.timeIntervalSinceNow < 60, credential.refreshToken != nil { credential = try await refreshKimiCredential(credential, accountID: account.id) }
     func call(_ credential: Credential) async throws -> HTTPResult { var headers = ["Authorization": "Bearer \(credential.accessToken)", "Accept": "application/json"]; credential.deviceHeaders?.forEach { headers[$0.key] = $0.value }; return try await http.send(URL(string: "https://api.kimi.com/coding/v1/usages")!, headers: headers) }
     var result = try await call(credential)
@@ -317,7 +652,30 @@ actor UsageService {
     let root = try result.jsonDictionary(); var windows: [UsageWindow] = []
     if let limits = root["limits"] as? [[String: Any]] { for (index, entry) in limits.enumerated() { let window = dictionary(entry["window"]) ?? entry; let detail = dictionary(entry["detail"]) ?? entry; if let parsed = parseKimiDetail(detail, duration: kimiDurationSeconds(window), id: "kimi-\(index)") { windows.append(parsed) } } }
     if let usage = dictionary(root["usage"]), !windows.contains(where: { $0.label == "周" }), let weekly = parseKimiDetail(usage, duration: 604_800, id: "kimi-week-summary") { windows.append(weekly) }
-    windows = uniqueWindows(windows); guard !windows.isEmpty else { throw UsageError.invalidResponse("No Kimi quota windows") }; return UsageSnapshot(accountID: account.id, provider: .kimi, windows: windows)
+    windows = uniqueWindows(windows); guard !windows.isEmpty else { throw UsageError.invalidResponse("No Kimi quota windows") }; return UsageSnapshot(accountID: account.id, provider: .kimi, windows: windows, authenticationMode: .oauth)
+  }
+
+  private func fetchKimiAPIKey(account: AccountRecord, credential: Credential) async throws -> UsageSnapshot {
+    let base = apiV1BaseURL(credential.baseURL, fallback: "https://api.moonshot.cn")
+    let result = try await http.send(
+      URL(string: "\(base)/models")!,
+      headers: ["Authorization": "Bearer \(credential.accessToken)", "Accept": "application/json"]
+    )
+    guard (200..<300).contains(result.statusCode) else {
+      throw UsageError.http(result.statusCode, String(data: result.data, encoding: .utf8) ?? "")
+    }
+    let root = try result.jsonDictionary()
+    let modelCount = (root["data"] as? [[String: Any]])?.count ?? 0
+    return UsageSnapshot(
+      accountID: account.id,
+      provider: .kimi,
+      metrics: [
+        UsageMetric(label: "认证", value: "API Key"),
+        UsageMetric(label: "可用模型", value: "\(modelCount)"),
+      ],
+      authenticationMode: .apiKey,
+      plan: "Kimi API"
+    )
   }
 
   private func refreshKimiCredential(_ credential: Credential, accountID: UUID) async throws -> Credential {
@@ -348,6 +706,7 @@ actor UsageService {
   private func parseKimiDetail(_ value: [String: Any], duration: Int64, id: String) -> UsageWindow? { guard let limit = number(value["limit"]), limit > 0 else { return nil }; let used = number(value["used"]) ?? (limit - (number(value["remaining"]) ?? limit)); var resetAt: Date?; for key in ["resetAt", "reset_at", "resetTime", "reset_time"] { if let parsed = flexibleDate(value[key]) { resetAt = parsed; break } }; if resetAt == nil { for key in ["resetIn", "reset_in", "ttl"] { if let seconds = int64(value[key]), seconds >= 0 { resetAt = Date().addingTimeInterval(TimeInterval(seconds)); break } } }; return UsageWindow(id: id, label: durationLabel(seconds: duration), remainingPercent: ((limit-used)/limit)*100, resetAt: resetAt) }
   private func numericMetrics(_ value: [String: Any], keys: [String]) -> [UsageMetric] { keys.compactMap { key in guard let value = number(value[key]) else { return nil }; return UsageMetric(label: displayLabel(key), value: formatNumber(value)) } }
   private func normalizedBaseURL(_ value: String?, fallback: String) -> String { (value?.trimmingCharacters(in: CharacterSet(charactersIn: "/"))).flatMap { $0.isEmpty ? nil : $0 } ?? fallback }
+  private func apiV1BaseURL(_ value: String?, fallback: String) -> String { let base=normalizedBaseURL(value,fallback:fallback);return base.lowercased().hasSuffix("/v1") ? base:"\(base)/v1" }
   private func formBody(_ values: [String: String]) -> Data { values.map { "\(urlEncode($0.key))=\(urlEncode($0.value))" }.sorted().joined(separator: "&").data(using: .utf8) ?? Data() }
   private func urlEncode(_ value: String) -> String { var allowed = CharacterSet.urlQueryAllowed; allowed.remove(charactersIn: "+&="); return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value }
   private func dictionary(_ value: Any?) -> [String: Any]? { value as? [String: Any] }
@@ -356,6 +715,15 @@ actor UsageService {
   private func int64(_ value: Any?) -> Int64? { if let number = value as? NSNumber { return number.int64Value }; if let string = value as? String { return Int64(string) }; return nil }
   private func bool(_ value: Any?) -> Bool? { if let bool = value as? Bool { return bool }; if let number = value as? NSNumber { return number.boolValue }; return nil }
   private func parseISODate(_ value: String?) -> Date? { guard let value else { return nil }; return ISO8601DateFormatter().date(from: value) }
+  private func parseCodexDay(_ value: String?) -> Date? {
+    guard let value else { return nil }
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.date(from: value)
+  }
   private func flexibleDate(_ value: Any?) -> Date? { if let n = value as? NSNumber { let raw = n.doubleValue; return Date(timeIntervalSince1970: raw > 10_000_000_000 ? raw/1000 : raw) }; if let string = value as? String { return parseISODate(string) }; return nil }
   private func formatNumber(_ value: Double) -> String { if value.rounded() == value { return String(Int(value)) }; return String(format: "%.2f", value) }
   private func displayLabel(_ value: String) -> String { value.replacingOccurrences(of: "_", with: " ").capitalized }

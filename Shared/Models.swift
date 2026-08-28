@@ -45,6 +45,11 @@ struct AccountRecord: Codable, Identifiable, Hashable, Sendable {
   }
 }
 
+enum CredentialAuthenticationMode: String, Codable, Hashable, Sendable {
+  case oauth
+  case apiKey
+}
+
 struct Credential: Codable, Sendable {
   var accessToken: String
   var refreshToken: String?
@@ -54,9 +59,10 @@ struct Credential: Codable, Sendable {
   var clientID: String?
   var baseURL: String?
   var deviceHeaders: [String: String]?
+  var authenticationMode: CredentialAuthenticationMode?
 
-  init(accessToken: String, refreshToken: String? = nil, idToken: String? = nil, accountID: String? = nil, expiresAt: Date? = nil, clientID: String? = nil, baseURL: String? = nil, deviceHeaders: [String: String]? = nil) {
-    self.accessToken = accessToken; self.refreshToken = refreshToken; self.idToken = idToken; self.accountID = accountID; self.expiresAt = expiresAt; self.clientID = clientID; self.baseURL = baseURL; self.deviceHeaders = deviceHeaders
+  init(accessToken: String, refreshToken: String? = nil, idToken: String? = nil, accountID: String? = nil, expiresAt: Date? = nil, clientID: String? = nil, baseURL: String? = nil, deviceHeaders: [String: String]? = nil, authenticationMode: CredentialAuthenticationMode? = nil) {
+    self.accessToken = accessToken; self.refreshToken = refreshToken; self.idToken = idToken; self.accountID = accountID; self.expiresAt = expiresAt; self.clientID = clientID; self.baseURL = baseURL; self.deviceHeaders = deviceHeaders; self.authenticationMode = authenticationMode
   }
 }
 
@@ -104,6 +110,50 @@ struct CodexQuotaResetResult: Hashable, Sendable {
   var windowsReset: Int
 }
 
+struct CodexDailyTokenUsage: Codable, Hashable, Sendable, Identifiable {
+  var id: Date { startDate }
+  var startDate: Date
+  var tokens: Int64
+}
+
+struct CodexTokenUsageSummary: Codable, Hashable, Sendable {
+  var lifetimeTokens: Int64?
+  var peakDailyTokens: Int64?
+  var longestRunningTurnSeconds: Int64?
+  var currentStreakDays: Int64?
+  var longestStreakDays: Int64?
+  var dailyUsageBuckets: [CodexDailyTokenUsage]
+
+  var hasData: Bool {
+    lifetimeTokens != nil
+      || peakDailyTokens != nil
+      || longestRunningTurnSeconds != nil
+      || currentStreakDays != nil
+      || longestStreakDays != nil
+      || !dailyUsageBuckets.isEmpty
+  }
+}
+
+struct CodexModelTokenUsage: Codable, Hashable, Sendable, Identifiable {
+  var id: String { "\(model)|\(reasoningEffort ?? "")|\(speed ?? "")" }
+  var model: String
+  var reasoningEffort: String?
+  var speed: String?
+  var inputTokens: Int64
+  var cachedInputTokens: Int64
+  var outputTokens: Int64
+  var totalTokens: Int64
+  var estimatedUsageCreditsMicros: Int64
+}
+
+struct CodexModelUsageSummary: Codable, Hashable, Sendable {
+  var groups: [CodexModelTokenUsage]
+  var returnedThreadCount: Int
+  var estimatedUsageUSDMicros: Int64?
+  var isPartial: Bool
+  var fetchedAt: Date
+}
+
 enum ProviderErrorKind: String, Codable, Hashable, Sendable {
   case authentication
   case rateLimited
@@ -135,16 +185,19 @@ struct UsageSnapshot: Codable, Hashable, Sendable, Identifiable {
   var metrics: [UsageMetric]
   var balance: BalanceSnapshot?
   var codexResetCredits: CodexResetCreditSummary?
+  var codexTokenUsage: CodexTokenUsageSummary?
+  var codexModelUsage: CodexModelUsageSummary?
+  var authenticationMode: CredentialAuthenticationMode?
   var plan: String?
   var errorMessage: String?
   var errorKind: ProviderErrorKind?
   var stale: Bool
 
-  init(accountID: UUID, provider: ProviderID, fetchedAt: Date = .now, windows: [UsageWindow] = [], metrics: [UsageMetric] = [], balance: BalanceSnapshot? = nil, codexResetCredits: CodexResetCreditSummary? = nil, plan: String? = nil, errorMessage: String? = nil, errorKind: ProviderErrorKind? = nil, stale: Bool = false) {
-    self.accountID = accountID; self.provider = provider; self.fetchedAt = fetchedAt; self.windows = windows; self.metrics = metrics; self.balance = balance; self.codexResetCredits = codexResetCredits; self.plan = plan; self.errorMessage = errorMessage; self.errorKind = errorKind; self.stale = stale
+  init(accountID: UUID, provider: ProviderID, fetchedAt: Date = .now, windows: [UsageWindow] = [], metrics: [UsageMetric] = [], balance: BalanceSnapshot? = nil, codexResetCredits: CodexResetCreditSummary? = nil, codexTokenUsage: CodexTokenUsageSummary? = nil, codexModelUsage: CodexModelUsageSummary? = nil, authenticationMode: CredentialAuthenticationMode? = nil, plan: String? = nil, errorMessage: String? = nil, errorKind: ProviderErrorKind? = nil, stale: Bool = false) {
+    self.accountID = accountID; self.provider = provider; self.fetchedAt = fetchedAt; self.windows = windows; self.metrics = metrics; self.balance = balance; self.codexResetCredits = codexResetCredits; self.codexTokenUsage = codexTokenUsage; self.codexModelUsage = codexModelUsage; self.authenticationMode = authenticationMode; self.plan = plan; self.errorMessage = errorMessage; self.errorKind = errorKind; self.stale = stale
   }
 
-  private enum CodingKeys: String, CodingKey { case accountID, provider, fetchedAt, windows, metrics, balance, codexResetCredits, plan, errorMessage, errorKind, stale }
+  private enum CodingKeys: String, CodingKey { case accountID, provider, fetchedAt, windows, metrics, balance, codexResetCredits, codexTokenUsage, codexModelUsage, authenticationMode, plan, errorMessage, errorKind, stale }
 
   init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -155,6 +208,9 @@ struct UsageSnapshot: Codable, Hashable, Sendable, Identifiable {
     metrics = try c.decodeIfPresent([UsageMetric].self, forKey: .metrics) ?? []
     balance = try c.decodeIfPresent(BalanceSnapshot.self, forKey: .balance)
     codexResetCredits = try c.decodeIfPresent(CodexResetCreditSummary.self, forKey: .codexResetCredits)
+    codexTokenUsage = try c.decodeIfPresent(CodexTokenUsageSummary.self, forKey: .codexTokenUsage)
+    codexModelUsage = try c.decodeIfPresent(CodexModelUsageSummary.self, forKey: .codexModelUsage)
+    authenticationMode = try c.decodeIfPresent(CredentialAuthenticationMode.self, forKey: .authenticationMode)
     plan = try c.decodeIfPresent(String.self, forKey: .plan)
     errorMessage = try c.decodeIfPresent(String.self, forKey: .errorMessage)
     errorKind = try c.decodeIfPresent(ProviderErrorKind.self, forKey: .errorKind)

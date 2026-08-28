@@ -36,6 +36,8 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: true
         GENERATE_INFOPLIST_FILE: true
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIconClassic AppIconNight"
+        ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: true
     info:
       path: AIQuotaApp/Info.plist
       properties:

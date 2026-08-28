@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import com.trilogys.aiquota.core.Credential
+import com.trilogys.aiquota.core.CredentialAuthenticationMode
 import com.trilogys.aiquota.core.UsageService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -114,7 +115,8 @@ class OAuthManager(
             accessToken = json.getString("access_token"),
             refreshToken = json.optString("refresh_token").takeIf { it.isNotBlank() },
             expiresAtEpochSeconds = json.optLong("expires_in").takeIf { it > 0 }?.let { System.currentTimeMillis() / 1000 + it },
-            clientId = UsageService.CLAUDE_CLIENT_ID
+            clientId = UsageService.CLAUDE_CLIENT_ID,
+            authenticationMode = CredentialAuthenticationMode.OAUTH
         )
     }
 
@@ -158,7 +160,8 @@ class OAuthManager(
                     refreshToken = body.optString("refresh_token").takeIf { it.isNotBlank() },
                     expiresAtEpochSeconds = body.optLong("expires_in").takeIf { it > 0 }?.let { System.currentTimeMillis() / 1000 + it },
                     clientId = UsageService.KIMI_CLIENT_ID,
-                    deviceHeaders = headers
+                    deviceHeaders = headers,
+                    authenticationMode = CredentialAuthenticationMode.OAUTH
                 )
             }
             when (body.optString("error")) {
@@ -193,7 +196,8 @@ class OAuthManager(
             refreshToken = json.optString("refresh_token").takeIf { it.isNotBlank() },
             idToken = idToken,
             accountId = findJwtClaim(idToken, "chatgpt_account_id"),
-            clientId = UsageService.CODEX_CLIENT_ID
+            clientId = UsageService.CODEX_CLIENT_ID,
+            authenticationMode = CredentialAuthenticationMode.OAUTH
         )
     }
 

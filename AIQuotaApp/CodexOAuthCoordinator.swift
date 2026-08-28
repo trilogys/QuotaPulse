@@ -111,7 +111,8 @@ final class CodexOAuthCoordinator: NSObject, SFSafariViewControllerDelegate {
       refreshToken: refresh,
       idToken: idToken,
       accountID: accountID,
-      clientID: AppConfig.codexClientID
+      clientID: AppConfig.codexClientID,
+      authenticationMode: .oauth
     )
   }
 }

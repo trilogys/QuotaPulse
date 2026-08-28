@@ -64,7 +64,8 @@ final class ClaudeOAuthCoordinator: NSObject, SFSafariViewControllerDelegate {
       accessToken: access,
       refreshToken: json["refresh_token"] as? String,
       expiresAt: expires,
-      clientID: AppConfig.claudeClientID
+      clientID: AppConfig.claudeClientID,
+      authenticationMode: .oauth
     )
   }
 

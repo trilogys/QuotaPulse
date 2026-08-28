@@ -6,9 +6,9 @@ AI 服务额度监控：**原生 iOS + 原生 Android + 桌面小组件 + 多账
 
 ## Provider
 
-- Codex：ChatGPT OAuth / credentials 导入，多账号，动态额度窗口
-- Claude：OAuth / credentials 导入，多账号，5h / 周
-- Kimi：Device OAuth / credentials 导入，多账号，动态额度窗口
+- Codex / OpenAI：ChatGPT OAuth 或 API Key，多账号，动态额度窗口、累计与每日 Token
+- Claude：OAuth 或 API Key，多账号，OAuth 账号显示 5h / 周额度
+- Kimi：Device OAuth 或 API Key，多账号，OAuth 账号显示动态额度窗口
 - DeepSeek：API Key，多账号，余额
 
 iOS 端还保留 MiniMax、GLM / Z.ai、GitHub Copilot 等适配，后续逐步同步 Android。
@@ -32,8 +32,11 @@ QuotaPulse 不直接复制某一个项目的 UI，而是组合三个方向：
 
 当前支持：
 
-- Codex / Claude / Kimi OAuth
+- Codex / Claude / Kimi 支持 OAuth 与 API Key 两种账号模式
 - DeepSeek API Key
+- 导入 QuotaPulse 或 Sub2API 账号 JSON；兼容 OpenAI OAuth、Anthropic OAuth / Setup Token 和单一账号代理
+- 多个命名 HTTP(S) / SOCKS5 代理：链接导入、Codex / Claude 适用范围、单一激活项、账号密码与测速
+- OAuth 与 API Key 账号创建时均可自定义显示名称
 - OAuth token 自动 refresh
 - 多账号 UUID 隔离
 - 账号重命名、启用/隐藏、排序
@@ -42,9 +45,12 @@ QuotaPulse 不直接复制某一个项目的 UI，而是组合三个方向：
 - Codex / Claude / Kimi 原账号一键重新认证，保持 UUID 与 Widget 绑定不变
 - 额度 Reset 倒计时
 - Codex 5h / 周额度重置安排、可用重置次数查询和用户确认后手动重置
+- Codex OAuth 累计 Token、单日峰值、连续使用天数、官方每日 Token 走势图与手动按模型明细查询
+- Codex 官方 12 个月 Token 热力图，支持每日 / 每周 / 累计切换和日期点选
 - 最近 31 天本机历史：今天 / 近 7 天 / 近 30 天
 - 圆环 / 柱状 / 折线 / 热力图切换，显示真实峰值使用率和日期
 - “全部”页可选择按 Provider 分开展示或叠加汇总
+- 总览前台定时刷新：关闭 / 30 秒 / 1 分钟 / 5 分钟 / 10 分钟
 - WidgetKit Small / Medium / Large 自适应信息密度
 - Widget 内 `↻` 原地刷新，不打开主 App
 - Widget timeline 自动刷新

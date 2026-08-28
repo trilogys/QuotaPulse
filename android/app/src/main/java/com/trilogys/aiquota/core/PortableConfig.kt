@@ -51,12 +51,14 @@ object PortableConfigCodec {
         .put("accessToken", value.accessToken).putNullable("refreshToken", value.refreshToken).putNullable("idToken", value.idToken)
         .putNullable("accountID", value.accountId).putNullable("expiresAt", value.expiresAtEpochSeconds?.let { Instant.ofEpochSecond(it).toString() })
         .putNullable("clientID", value.clientId).putNullable("baseURL", value.baseUrl)
+        .putNullable("authenticationMode", value.authenticationMode?.let { if(it==CredentialAuthenticationMode.API_KEY)"apiKey" else "oauth" })
         .put("deviceHeaders", value.deviceHeaders?.let { JSONObject(it) } ?: JSONObject.NULL)
 
     private fun credentialFromJson(json: JSONObject): Credential {
         val headers = json.optJSONObject("deviceHeaders")?.let { obj -> obj.keys().asSequence().associateWith { obj.getString(it) } }
         val expires = json.stringOrNull("expiresAt")?.let { runCatching { Instant.parse(it).epochSecond }.getOrNull() }
-        return Credential(accessToken=json.getString("accessToken"), refreshToken=json.stringOrNull("refreshToken"), expiresAtEpochSeconds=expires, accountId=json.stringOrNull("accountID"), clientId=json.stringOrNull("clientID"), idToken=json.stringOrNull("idToken"), deviceHeaders=headers, baseUrl=json.stringOrNull("baseURL"))
+        val mode=json.stringOrNull("authenticationMode")?.let{raw->CredentialAuthenticationMode.entries.firstOrNull{it.name.equals(raw,true)||it.name.replace("_","").equals(raw.replace("_",""),true)}}
+        return Credential(accessToken=json.getString("accessToken"), refreshToken=json.stringOrNull("refreshToken"), expiresAtEpochSeconds=expires, accountId=json.stringOrNull("accountID"), clientId=json.stringOrNull("clientID"), idToken=json.stringOrNull("idToken"), deviceHeaders=headers, baseUrl=json.stringOrNull("baseURL"), authenticationMode=mode)
     }
 
     private fun JSONObject.putNullable(key:String,value:Any?):JSONObject=put(key,value ?: JSONObject.NULL)

@@ -20,12 +20,17 @@ private enum AccountSortMode: String, CaseIterable, Identifiable {
 }
 
 struct ContentView: View {
+  @Environment(\.scenePhase) private var scenePhase
   @StateObject private var model = AppModel()
   @State private var selectedTheme: DashboardTheme = .daylight
   @State private var selectedProvider: ProviderID?
   @State private var sortMode: AccountSortMode = .manual
   @State private var aggregateHistory = false
+  @State private var overviewAutoRefreshSeconds = 0
   @State private var apiProvider: ProviderID?
+  @State private var apiCredentialTarget: AccountRecord?
+  @State private var namingOAuthProvider: ProviderID?
+  @State private var newOAuthAccountName = ""
   @State private var renameTarget: AccountRecord?
   @State private var renameText = ""
   @State private var showingSettings = false
@@ -48,6 +53,7 @@ struct ContentView: View {
             UsageHistoryDashboard(
               history: enabledUsageHistory,
               accounts: enabledAccounts,
+              snapshots: model.snapshots,
               selectedProvider: selectedProvider,
               aggregateProviders: aggregateHistory
             )
@@ -74,7 +80,11 @@ struct ContentView: View {
       .task {
         selectedTheme = await SharedStore.shared.dashboardTheme()
         aggregateHistory = await SharedStore.shared.aggregateHistory()
+        overviewAutoRefreshSeconds = await SharedStore.shared.overviewAutoRefreshSeconds()
         await model.load()
+      }
+      .task(id: overviewRefreshTaskID) {
+        await runOverviewAutoRefresh()
       }
       .alert(
         "错误",
@@ -114,16 +124,50 @@ struct ContentView: View {
           renameTarget = nil
         }
       }
+      .alert(
+        "添加 OAuth 账号",
+        isPresented: Binding(
+          get: { namingOAuthProvider != nil },
+          set: { if !$0 { namingOAuthProvider = nil } }
+        )
+      ) {
+        TextField("账号名称（可选）", text: $newOAuthAccountName)
+        Button("取消", role: .cancel) {
+          namingOAuthProvider = nil
+          newOAuthAccountName = ""
+        }
+        Button("继续登录") {
+          if let provider = namingOAuthProvider {
+            let name = newOAuthAccountName.trimmingCharacters(in: .whitespacesAndNewlines)
+            namingOAuthProvider = nil
+            newOAuthAccountName = ""
+            loginOAuth(provider, customName: name.isEmpty ? nil : name)
+          }
+        }
+      } message: {
+        Text("名称只用于本机显示；留空时自动使用邮箱或账号标识。")
+      }
       .sheet(item: $apiProvider) { provider in
-        APIKeyEntryView(provider: provider) { key, baseURL in
-          await model.addAPIKey(provider: provider, key: key, baseURL: baseURL)
+        APIKeyEntryView(provider: provider) { name, key, baseURL in
+          await model.addAPIKey(provider: provider, name: name, key: key, baseURL: baseURL)
+        }
+      }
+      .sheet(item: $apiCredentialTarget) { account in
+        APIKeyEntryView(
+          provider: account.provider,
+          initialName: account.label,
+          initialBaseURL: model.apiBaseURL(account),
+          isEditing: true
+        ) { name, key, baseURL in
+          await model.updateAPIKey(account, name: name, key: key, baseURL: baseURL)
         }
       }
       .sheet(isPresented: $showingSettings) {
         SettingsView(
           model: model,
           selectedTheme: $selectedTheme,
-          aggregateHistory: $aggregateHistory
+          aggregateHistory: $aggregateHistory,
+          overviewAutoRefreshSeconds: $overviewAutoRefreshSeconds
         )
       }
     }
@@ -176,9 +220,13 @@ struct ContentView: View {
 
   private var addMenu: some View {
     Menu {
-      Button("Codex · ChatGPT 登录") { loginOAuth(.codex) }
-      Button("Claude · OAuth 登录") { loginOAuth(.claude) }
-      Button("Kimi · OAuth 登录") { loginOAuth(.kimi) }
+      Button("Codex · ChatGPT 登录") { beginOAuth(.codex) }
+      Button("Claude · OAuth 登录") { beginOAuth(.claude) }
+      Button("Kimi · OAuth 登录") { beginOAuth(.kimi) }
+      Divider()
+      Button("OpenAI / GPT · API Key") { apiProvider = .codex }
+      Button("Claude · API Key") { apiProvider = .claude }
+      Button("Kimi · API Key") { apiProvider = .kimi }
       Divider()
       Button("DeepSeek · API Key") { apiProvider = .deepseek }
       Button("MiniMax · Coding Key") { apiProvider = .minimax }
@@ -257,15 +305,24 @@ struct ContentView: View {
         EmptyAccountsView(hasAccounts: !model.accounts.isEmpty)
       } else {
         ForEach(filteredAccounts) { account in
+          let usesAPIKey = model.usesAPIKey(account)
           AccountDashboardCard(
             account: account,
             snapshot: model.snapshots[account.id],
             cooldownUntil: model.cooldownUntil(account),
             recommended: recommendedAccountIDs.contains(account.id),
             health: model.credentialHealth(account),
+            usesAPIKey: usesAPIKey,
             onRefresh: { await model.refresh(account) },
-            onReauthenticate: { await reauthenticate(account) },
+            onReauthenticate: {
+              if usesAPIKey {
+                apiCredentialTarget = account
+              } else {
+                await reauthenticate(account)
+              }
+            },
             onQueryResetCredits: { await model.queryCodexResetCredits(account) },
+            onQueryCodexModels: { await model.queryCodexModelUsage(account) },
             onResetCodexQuota: { await model.resetCodexQuota(account) },
             onRename: {
               renameTarget = account
@@ -329,16 +386,38 @@ struct ContentView: View {
     })
   }
 
-  private func loginOAuth(_ provider: ProviderID) {
+  private func beginOAuth(_ provider: ProviderID) {
+    newOAuthAccountName = ""
+    namingOAuthProvider = provider
+  }
+
+  private var overviewRefreshTaskID: String {
+    "\(overviewAutoRefreshSeconds)-\(scenePhase == .active)"
+  }
+
+  private func runOverviewAutoRefresh() async {
+    guard scenePhase == .active, overviewAutoRefreshSeconds > 0 else { return }
+    while !Task.isCancelled {
+      do {
+        try await Task.sleep(nanoseconds: UInt64(overviewAutoRefreshSeconds) * 1_000_000_000)
+      } catch {
+        return
+      }
+      guard scenePhase == .active else { return }
+      if !model.isBusy { await model.refreshAll(manual: false) }
+    }
+  }
+
+  private func loginOAuth(_ provider: ProviderID, customName: String?) {
     Task { @MainActor in
       guard let presenter = UIApplication.shared.activeTopViewController() else {
         model.errorMessage = "无法打开登录页面"
         return
       }
       switch provider {
-      case .codex: await model.addCodex(presenter: presenter)
-      case .claude: await model.addClaude(presenter: presenter)
-      case .kimi: await model.addKimi(presenter: presenter)
+      case .codex: await model.addCodex(name: customName, presenter: presenter)
+      case .claude: await model.addClaude(name: customName, presenter: presenter)
+      case .kimi: await model.addKimi(name: customName, presenter: presenter)
       default: break
       }
     }
@@ -503,9 +582,11 @@ private struct AccountDashboardCard: View {
   let cooldownUntil: Date?
   let recommended: Bool
   let health: CredentialHealth
+  let usesAPIKey: Bool
   let onRefresh: () async -> Void
   let onReauthenticate: () async -> Void
   let onQueryResetCredits: () async -> Void
+  let onQueryCodexModels: () async -> Void
   let onResetCodexQuota: () async -> Void
   let onRename: () -> Void
   let onToggle: () -> Void
@@ -536,9 +617,12 @@ private struct AccountDashboardCard: View {
                 .background(theme.success, in: Capsule())
             }
           }
-          Text(account.provider.title)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(theme.secondaryText)
+          HStack(spacing: 4) {
+            Text(account.provider.title)
+            Text(usesAPIKey ? "· API Key" : "· OAuth")
+          }
+          .font(.system(size: 11, weight: .medium))
+          .foregroundStyle(theme.secondaryText)
         }
         Spacer()
         CredentialStatusPill(health: health)
@@ -551,6 +635,7 @@ private struct AccountDashboardCard: View {
           accent: accent,
           cooldownUntil: cooldownUntil,
           onQueryResetCredits: onQueryResetCredits,
+          onQueryCodexModels: onQueryCodexModels,
           onResetCodexQuota: onResetCodexQuota
         )
       } else {
@@ -585,7 +670,10 @@ private struct AccountDashboardCard: View {
             reauthenticating = false
           }
         } label: {
-          Label(reauthenticating ? "认证中" : "重新认证", systemImage: "key")
+          Label(
+            reauthenticating ? "认证中" : (usesAPIKey ? "更新 Key" : "重新认证"),
+            systemImage: "key"
+          )
         }
         .disabled(reauthenticating)
 
@@ -649,6 +737,7 @@ private struct SnapshotDashboardBody: View {
   let accent: Color
   let cooldownUntil: Date?
   let onQueryResetCredits: () async -> Void
+  let onQueryCodexModels: () async -> Void
   let onResetCodexQuota: () async -> Void
 
   var body: some View {
@@ -697,6 +786,16 @@ private struct SnapshotDashboardBody: View {
           .foregroundStyle(theme.secondaryText)
       }
 
+      if let tokenUsage = snapshot.codexTokenUsage, tokenUsage.hasData {
+        CodexTokenUsageSummaryView(
+          usage: tokenUsage,
+          modelUsage: snapshot.codexModelUsage,
+          accent: accent,
+          allowsModelQuery: snapshot.authenticationMode != .apiKey,
+          onQueryModels: onQueryCodexModels
+        )
+      }
+
       if snapshot.provider == .codex, !snapshot.windows.isEmpty {
         CodexResetSchedule(
           windows: snapshot.windows,
@@ -728,7 +827,168 @@ private struct SnapshotDashboardBody: View {
   }
 
   private var hasCachedData: Bool {
-    !snapshot.windows.isEmpty || !snapshot.metrics.isEmpty || snapshot.balance != nil
+    !snapshot.windows.isEmpty
+      || !snapshot.metrics.isEmpty
+      || snapshot.balance != nil
+      || snapshot.codexTokenUsage?.hasData == true
+  }
+}
+
+private struct CodexTokenUsageSummaryView: View {
+  @Environment(\.dashboardTheme) private var theme
+  let usage: CodexTokenUsageSummary
+  let modelUsage: CodexModelUsageSummary?
+  let accent: Color
+  let allowsModelQuery: Bool
+  let onQueryModels: () async -> Void
+  @State private var queryingModels = false
+
+  private var latestBucket: CodexDailyTokenUsage? {
+    usage.dailyUsageBuckets.max { $0.startDate < $1.startDate }
+  }
+
+  private var items: [(label: String, value: String)] {
+    var values: [(String, String)] = []
+    if let lifetime = usage.lifetimeTokens {
+      values.append(("累计 Token", compactTokens(lifetime)))
+    }
+    if let peak = usage.peakDailyTokens {
+      values.append(("单日峰值", compactTokens(peak)))
+    }
+    if let streak = usage.currentStreakDays {
+      values.append(("当前连续天数", dayCount(streak)))
+    }
+    if let streak = usage.longestStreakDays {
+      values.append(("最长连续天数", dayCount(streak)))
+    }
+    if values.count < 4, let latestBucket {
+      let label = Calendar.current.isDateInToday(latestBucket.startDate)
+        ? "今日 Token"
+        : latestBucket.startDate.formatted(.dateTime.month().day())
+      values.append((label, compactTokens(latestBucket.tokens)))
+    }
+    return Array(values.prefix(4))
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 9) {
+      Label {
+        Text(allowsModelQuery
+          ? LocalizedStringKey("Codex Token 用量")
+          : LocalizedStringKey("OpenAI Token 用量"))
+      } icon: {
+        Image(systemName: "number")
+      }
+        .font(.system(size: 10, weight: .semibold))
+        .foregroundStyle(accent)
+      LazyVGrid(
+        columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: 2),
+        alignment: .leading,
+        spacing: 10
+      ) {
+        ForEach(Array(items.enumerated()), id: \.offset) { item in
+          VStack(alignment: .leading, spacing: 2) {
+            Text(LocalizedStringKey(item.element.label))
+              .font(.system(size: 9, weight: .medium))
+              .foregroundStyle(theme.secondaryText)
+              .lineLimit(1)
+            Text(item.element.value)
+              .font(.system(size: 15, weight: .bold, design: .rounded))
+              .lineLimit(1)
+              .minimumScaleFactor(0.72)
+          }
+        }
+      }
+
+      if let modelUsage, !modelUsage.groups.isEmpty {
+        Divider().overlay(theme.border)
+        HStack(spacing: 8) {
+          Text("模型明细")
+            .font(.system(size: 10, weight: .semibold))
+          Group {
+            if allowsModelQuery {
+              Text("\(modelUsage.returnedThreadCount) 个线程")
+            } else {
+              Text("\(modelUsage.returnedThreadCount) 次请求")
+            }
+          }
+          .font(.system(size: 9, weight: .medium))
+          .foregroundStyle(theme.secondaryText)
+          Spacer()
+          if let micros = modelUsage.estimatedUsageUSDMicros {
+            Text("约 $\(Double(micros) / 1_000_000, specifier: "%.4f")")
+              .font(.system(size: 10, weight: .bold, design: .rounded))
+              .foregroundStyle(accent)
+          }
+        }
+        ForEach(modelUsage.groups.prefix(6)) { group in
+          VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+              Text(group.model)
+                .font(.system(size: 11, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+              Spacer()
+              Text(compactTokens(group.totalTokens))
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(accent)
+            }
+            Text(modelDetail(group))
+              .font(.system(size: 8, weight: .medium))
+              .foregroundStyle(theme.secondaryText)
+              .lineLimit(1)
+              .minimumScaleFactor(0.65)
+          }
+        }
+        if modelUsage.isPartial {
+          Text(allowsModelQuery
+            ? LocalizedStringKey("模型汇总来自最近一页云端任务")
+            : LocalizedStringKey("模型汇总仅包含本次返回的用量页"))
+            .font(.system(size: 8, weight: .medium))
+            .foregroundStyle(theme.secondaryText)
+        }
+      }
+
+      if allowsModelQuery {
+        Button {
+          queryingModels = true
+          Task {
+            await onQueryModels()
+            queryingModels = false
+          }
+        } label: {
+          Label(queryingModels ? "查询中" : "更新模型明细", systemImage: "arrow.clockwise")
+            .font(.system(size: 9, weight: .semibold))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(accent)
+        .disabled(queryingModels)
+      }
+    }
+    .padding(.top, 2)
+  }
+
+  private func compactTokens(_ value: Int64) -> String {
+    let number = Double(value)
+    if abs(number) >= 1_000_000_000 { return String(format: "%.1fB", number / 1_000_000_000) }
+    if abs(number) >= 1_000_000 { return String(format: "%.1fM", number / 1_000_000) }
+    if abs(number) >= 1_000 { return String(format: "%.1fK", number / 1_000) }
+    return "\(value)"
+  }
+
+  private func dayCount(_ value: Int64) -> String {
+    String.localizedStringWithFormat(NSLocalizedString("%lld 天", comment: ""), value)
+  }
+
+  private func modelDetail(_ usage: CodexModelTokenUsage) -> String {
+    var parts = [
+      "\(NSLocalizedString("输入", comment: "")) \(compactTokens(usage.inputTokens))",
+      "\(NSLocalizedString("缓存", comment: "")) \(compactTokens(usage.cachedInputTokens))",
+      "\(NSLocalizedString("输出", comment: "")) \(compactTokens(usage.outputTokens))",
+    ]
+    if let effort = usage.reasoningEffort, !effort.isEmpty { parts.append(effort) }
+    if let speed = usage.speed, !speed.isEmpty { parts.append(speed) }
+    return parts.joined(separator: " · ")
   }
 }
 
@@ -904,13 +1164,53 @@ struct CredentialHealth {
   let color: Color
 }
 
+private enum AppIconChoice: String, CaseIterable, Identifiable {
+  case current
+  case classic
+  case night
+
+  var id: String { rawValue }
+
+  var title: LocalizedStringKey {
+    switch self {
+    case .current: "翠绿脉冲"
+    case .classic: "经典绿环"
+    case .night: "深色霓虹"
+    }
+  }
+
+  var previewAsset: String {
+    switch self {
+    case .current: "AppIconCurrentPreview"
+    case .classic: "AppIconClassicPreview"
+    case .night: "AppIconNightPreview"
+    }
+  }
+
+  var alternateIconName: String? {
+    switch self {
+    case .current: nil
+    case .classic: "AppIconClassic"
+    case .night: "AppIconNight"
+    }
+  }
+
+  static func resolve(alternateIconName: String?) -> AppIconChoice {
+    allCases.first { $0.alternateIconName == alternateIconName } ?? .current
+  }
+}
+
 struct SettingsView: View {
   @ObservedObject var model: AppModel
   @Binding var selectedTheme: DashboardTheme
   @Binding var aggregateHistory: Bool
+  @Binding var overviewAutoRefreshSeconds: Int
   @Environment(\.dismiss) private var dismiss
   @State private var autoMinutes = 15
   @State private var confirmingHistoryClear = false
+  @State private var selectedAppIcon: AppIconChoice = .current
+  @State private var isChangingAppIcon = false
+  @State private var appIconError: String?
 
   var body: some View {
     NavigationStack {
@@ -923,6 +1223,23 @@ struct SettingsView: View {
           }
           .pickerStyle(.menu)
           ThemePreviewRow(theme: selectedTheme)
+        }
+        Section("App 图标") {
+          AppIconPicker(
+            selection: selectedAppIcon,
+            isChanging: isChangingAppIcon,
+            onSelect: selectAppIcon
+          )
+          if !UIApplication.shared.supportsAlternateIcons {
+            Text("当前设备或安装方式不支持切换 App 图标。")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+          if let appIconError {
+            Text("切换失败：\(appIconError)")
+              .font(.footnote)
+              .foregroundStyle(.red)
+          }
         }
         Section("网络") {
           NavigationLink {
@@ -942,6 +1259,19 @@ struct SettingsView: View {
           }
           .font(.footnote)
           .foregroundStyle(.secondary)
+        }
+        Section("总览自动刷新") {
+          Picker("前台刷新间隔", selection: $overviewAutoRefreshSeconds) {
+            Text("关闭").tag(0)
+            Text("30 秒").tag(30)
+            Text("1 分钟").tag(60)
+            Text("5 分钟").tag(300)
+            Text("10 分钟").tag(600)
+          }
+          .pickerStyle(.menu)
+          Text("仅在 QuotaPulse 位于前台时定时刷新；进入后台后停止，并遵守账号冷却时间。")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
         }
         if AppConfig.isAppOnlyBuild {
           Section("刷新") {
@@ -979,7 +1309,7 @@ struct SettingsView: View {
         }
         Section("隐私与本机存储") {
           Label("配置仅保存在本机", systemImage: "lock.shield")
-          Text("账号配置和走势图保存在本机；Token 与 API Key 由系统 Keychain 保护。额度请求只发往对应服务或你配置的代理，不经过 QuotaPulse 自建服务器。")
+          Text("账号配置和走势图保存在本机；Token 与 API Key 由系统 Keychain 保护。QuotaPulse 未在程序中使用自建服务器。")
             .font(.footnote)
             .foregroundStyle(.secondary)
         }
@@ -1042,7 +1372,12 @@ struct SettingsView: View {
           Button("完成") { dismiss() }
         }
       }
-      .task { autoMinutes = await SharedStore.shared.autoRefreshMinutes() }
+      .task {
+        autoMinutes = await SharedStore.shared.autoRefreshMinutes()
+        selectedAppIcon = AppIconChoice.resolve(
+          alternateIconName: UIApplication.shared.alternateIconName
+        )
+      }
       .onChange(of: autoMinutes) { newValue in
         guard !AppConfig.isAppOnlyBuild else { return }
         Task {
@@ -1059,9 +1394,88 @@ struct SettingsView: View {
       .onChange(of: aggregateHistory) { enabled in
         Task { await SharedStore.shared.setAggregateHistory(enabled) }
       }
+      .onChange(of: overviewAutoRefreshSeconds) { seconds in
+        Task { await SharedStore.shared.setOverviewAutoRefreshSeconds(seconds) }
+      }
     }
     .environment(\.dashboardTheme, selectedTheme)
     .preferredColorScheme(selectedTheme.preferredColorScheme)
+  }
+
+  private func selectAppIcon(_ choice: AppIconChoice) {
+    guard UIApplication.shared.supportsAlternateIcons,
+          !isChangingAppIcon,
+          choice != selectedAppIcon else { return }
+    isChangingAppIcon = true
+    appIconError = nil
+    UIApplication.shared.setAlternateIconName(choice.alternateIconName) { error in
+      DispatchQueue.main.async {
+        isChangingAppIcon = false
+        if let error {
+          appIconError = error.localizedDescription
+          selectedAppIcon = AppIconChoice.resolve(
+            alternateIconName: UIApplication.shared.alternateIconName
+          )
+        } else {
+          selectedAppIcon = choice
+        }
+      }
+    }
+  }
+}
+
+private struct AppIconPicker: View {
+  let selection: AppIconChoice
+  let isChanging: Bool
+  let onSelect: (AppIconChoice) -> Void
+
+  private let columns = Array(
+    repeating: GridItem(.flexible(minimum: 72), spacing: 12),
+    count: 3
+  )
+
+  var body: some View {
+    LazyVGrid(columns: columns, spacing: 12) {
+      ForEach(AppIconChoice.allCases) { choice in
+        Button {
+          onSelect(choice)
+        } label: {
+          VStack(spacing: 8) {
+            ZStack(alignment: .topTrailing) {
+              Image(choice.previewAsset)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 64, height: 64)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay {
+                  RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(.primary.opacity(0.10), lineWidth: 0.5)
+                }
+                .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+              if selection == choice {
+                Image(systemName: "checkmark.circle.fill")
+                  .symbolRenderingMode(.palette)
+                  .foregroundStyle(.white, Color.accentColor)
+                  .font(.system(size: 20, weight: .semibold))
+                  .offset(x: 5, y: -5)
+              }
+            }
+            Text(choice.title)
+              .font(.system(size: 12, weight: selection == choice ? .semibold : .regular))
+              .foregroundStyle(.primary)
+              .lineLimit(1)
+              .minimumScaleFactor(0.75)
+          }
+          .frame(maxWidth: .infinity)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isChanging || selection == choice)
+        .accessibilityLabel(choice.title)
+        .accessibilityAddTraits(selection == choice ? .isSelected : [])
+      }
+    }
+    .padding(.vertical, 4)
   }
 }
 

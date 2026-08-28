@@ -69,15 +69,20 @@ struct HTTPClient: Sendable {
     config.timeoutIntervalForRequest = timeout
     config.timeoutIntervalForResource = timeout + 2
     let proxy: AppProxyConfiguration
+    let password: String
     if let proxyOverride {
       proxy = proxyOverride
+      password = proxyPasswordOverride ?? ""
+    } else if let profile = await SharedStore.shared.activeProxyProfile(for: url) {
+      proxy = profile.configuration
+      password = (try? KeychainStore.shared.proxyPassword(profileID: profile.id)) ?? ""
     } else {
-      proxy = await SharedStore.shared.proxyConfiguration()
+      proxy = .disabled
+      password = ""
     }
-    if let dictionary = proxy.connectionProxyDictionary() {
+    if let dictionary = proxy.connectionProxyDictionary(password: password) {
       config.connectionProxyDictionary = dictionary
     }
-    let password = proxyPasswordOverride ?? (try? KeychainStore.shared.proxyPassword()) ?? ""
     let delegate = ProxyAuthenticationDelegate(username: proxy.username, password: password)
     let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
     let (data, response) = try await session.data(for: request)

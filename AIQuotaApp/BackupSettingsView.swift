@@ -13,8 +13,10 @@ struct BackupSettingsView: View {
     Form {
       Section("导入") {
         Toggle("导入时替换现有账号", isOn: $replaceOnImport)
-        Button { importing = true } label: { Label("导入 QuotaPulse 配置", systemImage: "square.and.arrow.down") }
+        Button { importing = true } label: { Label("导入 QuotaPulse / Sub2API JSON", systemImage: "square.and.arrow.down") }
         Text(replaceOnImport ? "会先移除现有账号和对应凭据，再导入文件。" : "默认合并导入；相同账号会更新，不会重复创建。")
+          .font(.footnote).foregroundStyle(.secondary)
+        Text("Sub2API 支持 OpenAI OAuth、Anthropic OAuth / Setup Token；单一账号代理会新增为命名代理并激活。")
           .font(.footnote).foregroundStyle(.secondary)
       }
       Section("导出") {

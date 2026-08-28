@@ -78,7 +78,8 @@ final class KimiOAuthCoordinator: NSObject, SFSafariViewControllerDelegate {
           refreshToken: body["refresh_token"] as? String,
           expiresAt: number(body["expires_in"]).map { Date().addingTimeInterval($0) },
           clientID: AppConfig.kimiClientID,
-          deviceHeaders: headers
+          deviceHeaders: headers,
+          authenticationMode: .oauth
         )
       }
       let error = body["error"] as? String
