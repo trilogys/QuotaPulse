@@ -44,7 +44,7 @@ history_view=Path('AIQuotaApp/UsageHistoryView.swift').read_text(encoding='utf-8
 usage=Path('Shared/UsageService.swift').read_text(encoding='utf-8')
 assert 'UsageHistorySample' in history and 'UsageHistoryMetricKind' in history
 assert 'import Charts' in history_view
-assert all(value in history_view for value in ['case ring', 'case bar', 'case line'])
+assert all(value in history_view for value in ['case ring', 'case bar', 'case line', 'case heatmap'])
 assert 'aggregateHistory' in store and 'clearHistory' in store
 assert 'rate-limit-reset-credits/consume' in usage
 assert all(value in usage for value in ['credit_id', 'redeem_request_id', 'queryCodexResetCredits', 'consumeCodexResetCredit'])

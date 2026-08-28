@@ -76,6 +76,9 @@
 "圆环" = "Ring";
 "柱状" = "Bars";
 "折线" = "Line";
+"热力图" = "Heatmap";
+"低" = "Low";
+"高" = "High";
 "全部平台汇总" = "All Providers";
 "暂无历史走势" = "No Trend History";
 "下一次成功刷新后开始记录；至少两次记录后可看到变化。" = "Recording begins after the next successful refresh. Two or more records are needed to show a trend.";

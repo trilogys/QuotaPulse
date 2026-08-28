@@ -42,6 +42,7 @@ private enum HistoryChartMode: String, CaseIterable, Identifiable {
   case ring
   case bar
   case line
+  case heatmap
 
   var id: String { rawValue }
 
@@ -50,6 +51,7 @@ private enum HistoryChartMode: String, CaseIterable, Identifiable {
     case .ring: "圆环"
     case .bar: "柱状"
     case .line: "折线"
+    case .heatmap: "热力图"
     }
   }
 
@@ -58,6 +60,7 @@ private enum HistoryChartMode: String, CaseIterable, Identifiable {
     case .ring: "chart.donut"
     case .bar: "chart.bar.fill"
     case .line: "chart.xyaxis.line"
+    case .heatmap: "square.grid.3x3.fill"
     }
   }
 }
@@ -75,6 +78,14 @@ private struct HistorySeries: Identifiable {
   let kind: UsageHistoryMetricKind
   let unit: String
   let points: [HistoryPoint]
+}
+
+private struct HistoryHeatmapPoint: Identifiable {
+  var id: Date { date }
+  let date: Date
+  let value: Double
+  let provider: ProviderID
+  let unit: String
 }
 
 struct UsageHistoryDashboard: View {
@@ -269,6 +280,7 @@ private struct HistoryChartCard: View {
   let range: HistoryRange
   let mode: HistoryChartMode
   let series: [HistorySeries]
+  @State private var selectedHeatmapPoint: HistoryHeatmapPoint?
 
   private var allPoints: [(series: HistorySeries, point: HistoryPoint)] {
     series.flatMap { item in item.points.map { (item, $0) } }
@@ -276,6 +288,19 @@ private struct HistoryChartCard: View {
 
   private var peak: (series: HistorySeries, point: HistoryPoint)? {
     allPoints.max { $0.point.value < $1.point.value }
+  }
+
+  private var heatmapPoints: [HistoryHeatmapPoint] {
+    let grouped = Dictionary(grouping: allPoints) { $0.point.date }
+    return grouped.compactMap { date, values in
+      guard let peak = values.max(by: { $0.point.value < $1.point.value }) else { return nil }
+      return HistoryHeatmapPoint(
+        date: date,
+        value: peak.point.value,
+        provider: peak.series.provider,
+        unit: peak.series.unit
+      )
+    }.sorted { $0.date < $1.date }
   }
 
   private var chartDomain: ClosedRange<Double> {
@@ -329,6 +354,8 @@ private struct HistoryChartCard: View {
           barChart
         case .line:
           lineChart
+        case .heatmap:
+          heatmapChart
         }
       }
     }
@@ -433,6 +460,85 @@ private struct HistoryChartCard: View {
       .padding(.vertical, 8)
     }
     .frame(minHeight: 140)
+  }
+
+  private var heatmapChart: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      LazyVGrid(
+        columns: Array(repeating: GridItem(.flexible(), spacing: 5), count: 7),
+        spacing: 5
+      ) {
+        ForEach(heatmapPoints) { point in
+          Button {
+            selectedHeatmapPoint = point
+          } label: {
+            Text(heatmapLabel(point.date))
+              .font(.system(size: 9, weight: .semibold, design: .rounded))
+              .foregroundStyle(heatmapRatio(point) > 0.55 ? Color.white : theme.primaryText)
+              .lineLimit(1)
+              .minimumScaleFactor(0.72)
+              .frame(maxWidth: .infinity)
+              .aspectRatio(1, contentMode: .fit)
+              .background(
+                theme.success.opacity(0.12 + 0.78 * heatmapRatio(point)),
+                in: RoundedRectangle(cornerRadius: 6)
+              )
+              .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                  .stroke(
+                    selectedHeatmapPoint?.id == point.id ? theme.primary : Color.clear,
+                    lineWidth: 2
+                  )
+              }
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel(
+            "\(point.date.formatted(date: .abbreviated, time: range == .today ? .shortened : .omitted))，\(formatted(point.value, unit: point.unit))"
+          )
+        }
+      }
+
+      HStack(spacing: 5) {
+        Text("低")
+        ForEach(1...4, id: \.self) { level in
+          RoundedRectangle(cornerRadius: 3)
+            .fill(theme.success.opacity(0.12 + Double(level) * 0.19))
+            .frame(width: 15, height: 15)
+        }
+        Text("高")
+        Spacer()
+      }
+      .font(.system(size: 8, weight: .medium))
+      .foregroundStyle(theme.secondaryText)
+
+      if let selected = selectedHeatmapPoint {
+        HStack {
+          Text(selected.date.formatted(date: .abbreviated, time: range == .today ? .shortened : .omitted))
+          Spacer()
+          Text(selected.provider.title)
+          Text(formatted(selected.value, unit: selected.unit))
+            .fontWeight(.bold)
+            .foregroundStyle(theme.accent(for: selected.provider))
+        }
+        .font(.system(size: 10, weight: .medium))
+        .foregroundStyle(theme.secondaryText)
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+      }
+    }
+    .frame(minHeight: 176, alignment: .top)
+  }
+
+  private func heatmapRatio(_ point: HistoryHeatmapPoint) -> Double {
+    let ceiling = max(1, chartDomain.upperBound)
+    return min(1, max(0, point.value / ceiling))
+  }
+
+  private func heatmapLabel(_ date: Date) -> String {
+    if range == .today {
+      return "\(Calendar.current.component(.hour, from: date))时"
+    }
+    return "\(Calendar.current.component(.day, from: date))"
   }
 
   private func formatted(_ value: Double, unit: String) -> String {
