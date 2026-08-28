@@ -51,12 +51,12 @@ struct PortableConfigCodec {
       let credential = includeCredentials ? (try? keychain.credential(accountID:account.id)).flatMap{$0}.map(PortableCredential.init) : nil
       return PortableAccount(id:account.id,provider:account.provider.rawValue,label:account.label,providerAccountID:account.providerAccountID,isEnabled:account.isEnabled,sortOrder:account.sortOrder,createdAt:account.createdAt,credential:credential)
     }
-    let encoder=JSONEncoder();encoder.outputFormatting=[.prettyPrinted,.sortedKeys,.withoutEscapingSlashes];encoder.dateEncodingStrategy=.iso8601
+    let encoder=JSONEncoder();encoder.outputFormatting=[.prettyPrinted,.sortedKeys,.withoutEscapingSlashes];encoder.dateEncodingStrategy = .iso8601
     return try encoder.encode(PortableConfig(accounts:values))
   }
 
   static func decode(_ data:Data) throws -> PortableConfig {
-    let decoder=JSONDecoder();decoder.dateDecodingStrategy=.iso8601
+    let decoder=JSONDecoder();decoder.dateDecodingStrategy = .iso8601
     let config=try decoder.decode(PortableConfig.self,from:data)
     guard config.format == "ai-quota-native" else { throw PortableConfigError.invalidFormat }
     guard config.version <= PortableConfig.currentVersion else { throw PortableConfigError.unsupportedVersion(config.version) }
