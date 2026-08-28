@@ -23,9 +23,15 @@ assert 'credentialQuery' in ks and 'AppConfig.isAppOnlyBuild' in ks
 assert 'AppConfig.isWidgetExtension' in ks
 print('runtime keychain resolution: ok')
 
+theme=Path('Shared/DashboardTheme.swift').read_text(encoding='utf-8')
+store=Path('Shared/SharedStore.swift').read_text(encoding='utf-8')
+assert 'enum DashboardTheme' in theme
+assert all(case in theme for case in ['case neon', 'case graphite', 'case aurora', 'case daylight'])
+assert 'dashboardTheme' in store
+print('dashboard themes: ok')
+
 models=Path('Shared/Models.swift').read_text(encoding='utf-8')
 health=Path('Shared/ProviderHealth.swift').read_text(encoding='utf-8')
-store=Path('Shared/SharedStore.swift').read_text(encoding='utf-8')
 for case in ['authentication', 'rateLimited', 'providerUnavailable', 'network', 'invalidResponse', 'configuration', 'unknown']:
     assert f'case {case}' in models, case
 assert 'effectiveErrorKind' in health
