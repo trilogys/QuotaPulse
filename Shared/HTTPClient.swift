@@ -68,7 +68,12 @@ struct HTTPClient: Sendable {
     config.requestCachePolicy = .reloadIgnoringLocalCacheData
     config.timeoutIntervalForRequest = timeout
     config.timeoutIntervalForResource = timeout + 2
-    let proxy = proxyOverride ?? await SharedStore.shared.proxyConfiguration()
+    let proxy: AppProxyConfiguration
+    if let proxyOverride {
+      proxy = proxyOverride
+    } else {
+      proxy = await SharedStore.shared.proxyConfiguration()
+    }
     if let dictionary = proxy.connectionProxyDictionary() {
       config.connectionProxyDictionary = dictionary
     }
