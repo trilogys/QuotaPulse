@@ -77,6 +77,13 @@ enum DashboardTheme: String, CaseIterable, Codable, Identifiable, Sendable {
     }
   }
 
+  var primaryText: Color {
+    self == .daylight ? Color(red: 0.08, green: 0.09, blue: 0.12) : .white
+  }
+
+  var cardCornerRadius: CGFloat { 22 }
+  var compactCardCornerRadius: CGFloat { 16 }
+
   var primary: Color {
     switch self {
     case .neon: Color(red: 0.49, green: 0.20, blue: 0.96)
@@ -122,7 +129,7 @@ enum DashboardTheme: String, CaseIterable, Codable, Identifiable, Sendable {
 }
 
 private struct DashboardThemeEnvironmentKey: EnvironmentKey {
-  static let defaultValue: DashboardTheme = .neon
+  static let defaultValue: DashboardTheme = .daylight
 }
 
 extension EnvironmentValues {

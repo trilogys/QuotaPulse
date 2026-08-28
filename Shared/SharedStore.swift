@@ -41,7 +41,7 @@ actor SharedStore {
   func clearCooldown(accountID:UUID){defaults.removeObject(forKey:Key.cooldown(accountID))}
   func autoRefreshMinutes()->Int{let value=defaults.integer(forKey:Key.autoRefreshMinutes);return [10,15,30,60,120].contains(value) ? value : 15}
   func setAutoRefreshMinutes(_ minutes:Int){defaults.set(minutes,forKey:Key.autoRefreshMinutes)}
-  func dashboardTheme()->DashboardTheme{DashboardTheme(rawValue:defaults.string(forKey:Key.dashboardTheme) ?? "") ?? .neon}
+  func dashboardTheme()->DashboardTheme{DashboardTheme(rawValue:defaults.string(forKey:Key.dashboardTheme) ?? "") ?? .daylight}
   func setDashboardTheme(_ theme:DashboardTheme){defaults.set(theme.rawValue,forKey:Key.dashboardTheme)}
   func visibleAccountIDs()->[UUID]{guard let strings=defaults.array(forKey:Key.visibleAccountIDs) as? [String]else{return []};return strings.compactMap(UUID.init(uuidString:))}
   func setVisibleAccountIDs(_ ids:[UUID]){defaults.set(ids.map(\.uuidString),forKey:Key.visibleAccountIDs)}
