@@ -3,32 +3,9 @@ import SwiftUI
 import UIKit
 import WidgetKit
 
-private enum DashboardPalette {
-  static let background = Color(red: 0.035, green: 0.04, blue: 0.055)
-  static let surface = Color(red: 0.085, green: 0.09, blue: 0.115)
-  static let surfaceRaised = Color(red: 0.115, green: 0.12, blue: 0.15)
-  static let border = Color.white.opacity(0.12)
-  static let secondaryText = Color(red: 0.62, green: 0.64, blue: 0.72)
-  static let purple = Color(red: 0.49, green: 0.20, blue: 0.96)
-  static let cyan = Color(red: 0.25, green: 0.82, blue: 0.80)
-  static let orange = Color(red: 0.94, green: 0.39, blue: 0.18)
-  static let green = Color(red: 0.20, green: 0.78, blue: 0.45)
-
-  static func accent(for provider: ProviderID) -> Color {
-    switch provider {
-    case .codex: purple
-    case .claude: orange
-    case .kimi: green
-    case .deepseek: cyan
-    case .minimax: Color(red: 0.95, green: 0.65, blue: 0.18)
-    case .glm: Color(red: 0.30, green: 0.53, blue: 0.98)
-    case .copilot: Color(red: 0.78, green: 0.45, blue: 0.92)
-    }
-  }
-}
-
 struct ContentView: View {
   @StateObject private var model = AppModel()
+  @State private var selectedTheme: DashboardTheme = .neon
   @State private var selectedProvider: ProviderID?
   @State private var apiProvider: ProviderID?
   @State private var renameTarget: AccountRecord?
@@ -38,7 +15,7 @@ struct ContentView: View {
   var body: some View {
     NavigationStack {
       ZStack {
-        DashboardPalette.background.ignoresSafeArea()
+        selectedTheme.background.ignoresSafeArea()
         ScrollView {
           LazyVStack(alignment: .leading, spacing: 18) {
             header
@@ -71,7 +48,10 @@ struct ContentView: View {
         }
       }
       .toolbar(.hidden, for: .navigationBar)
-      .task { await model.load() }
+      .task {
+        selectedTheme = await SharedStore.shared.dashboardTheme()
+        await model.load()
+      }
       .alert(
         "错误",
         isPresented: Binding(
@@ -105,11 +85,11 @@ struct ContentView: View {
         }
       }
       .sheet(isPresented: $showingSettings) {
-        SettingsView(model: model)
-          .preferredColorScheme(.dark)
+        SettingsView(model: model, selectedTheme: $selectedTheme)
       }
     }
-    .preferredColorScheme(.dark)
+    .environment(\.dashboardTheme, selectedTheme)
+    .preferredColorScheme(selectedTheme.preferredColorScheme)
   }
 
   private var header: some View {
@@ -117,7 +97,7 @@ struct ContentView: View {
       VStack(alignment: .leading, spacing: 4) {
         Text("AI QUOTA")
           .font(.system(size: 12, weight: .bold))
-          .foregroundStyle(DashboardPalette.cyan)
+          .foregroundStyle(selectedTheme.secondary)
         Text("额度总览")
           .font(.system(size: 30, weight: .bold))
       }
@@ -130,14 +110,14 @@ struct ContentView: View {
 
   private var livePill: some View {
     HStack(spacing: 6) {
-      Circle().fill(DashboardPalette.green).frame(width: 6, height: 6)
+      Circle().fill(selectedTheme.success).frame(width: 6, height: 6)
       Text("LIVE")
         .font(.system(size: 10, weight: .bold))
     }
-    .foregroundStyle(DashboardPalette.green)
+    .foregroundStyle(selectedTheme.success)
     .padding(.horizontal, 10)
     .frame(height: 34)
-    .background(DashboardPalette.green.opacity(0.12), in: Capsule())
+    .background(selectedTheme.success.opacity(0.12), in: Capsule())
   }
 
   private func iconButton(systemName: String, action: @escaping () -> Void) -> some View {
@@ -145,8 +125,8 @@ struct ContentView: View {
       Image(systemName: systemName)
         .font(.system(size: 16, weight: .semibold))
         .frame(width: 36, height: 36)
-        .background(DashboardPalette.surfaceRaised, in: Circle())
-        .overlay(Circle().stroke(DashboardPalette.border, lineWidth: 1))
+        .background(selectedTheme.surfaceRaised, in: Circle())
+        .overlay(Circle().stroke(selectedTheme.border, lineWidth: 1))
     }
     .buttonStyle(.plain)
   }
@@ -166,7 +146,7 @@ struct ContentView: View {
         .font(.system(size: 18, weight: .semibold))
         .frame(width: 36, height: 36)
         .foregroundStyle(.white)
-        .background(DashboardPalette.purple, in: Circle())
+        .background(selectedTheme.primary, in: Circle())
     }
     .buttonStyle(.plain)
   }
@@ -174,13 +154,13 @@ struct ContentView: View {
   private var providerFilter: some View {
     ScrollView(.horizontal, showsIndicators: false) {
       HStack(spacing: 8) {
-        ProviderFilterButton(title: "全部", color: DashboardPalette.purple, isSelected: selectedProvider == nil) {
+        ProviderFilterButton(title: "全部", color: selectedTheme.primary, isSelected: selectedProvider == nil) {
           selectedProvider = nil
         }
         ForEach(ProviderID.allCases) { provider in
           ProviderFilterButton(
             title: provider.title,
-            color: DashboardPalette.accent(for: provider),
+            color: selectedTheme.accent(for: provider),
             isSelected: selectedProvider == provider
           ) {
             selectedProvider = provider
@@ -197,10 +177,10 @@ struct ContentView: View {
           .font(.system(size: 16, weight: .bold))
         Text("\(filteredAccounts.count)")
           .font(.system(size: 11, weight: .bold))
-          .foregroundStyle(DashboardPalette.secondaryText)
+          .foregroundStyle(selectedTheme.secondaryText)
           .padding(.horizontal, 8)
           .padding(.vertical, 4)
-          .background(DashboardPalette.surfaceRaised, in: Capsule())
+          .background(selectedTheme.surfaceRaised, in: Capsule())
         Spacer()
         Button {
           Task { await model.refreshAll() }
@@ -209,7 +189,7 @@ struct ContentView: View {
             .font(.system(size: 12, weight: .semibold))
         }
         .buttonStyle(.plain)
-        .foregroundStyle(DashboardPalette.cyan)
+        .foregroundStyle(selectedTheme.secondary)
         .disabled(model.isBusy || model.accounts.isEmpty)
       }
 
@@ -247,7 +227,7 @@ struct ContentView: View {
       Text("iOS 16+")
     }
     .font(.system(size: 11, weight: .medium))
-    .foregroundStyle(DashboardPalette.secondaryText)
+    .foregroundStyle(selectedTheme.secondaryText)
     .padding(.top, 2)
   }
 
@@ -307,6 +287,7 @@ struct ContentView: View {
 }
 
 private struct ProviderFilterButton: View {
+  @Environment(\.dashboardTheme) private var theme
   let title: String
   let color: Color
   let isSelected: Bool
@@ -316,18 +297,19 @@ private struct ProviderFilterButton: View {
     Button(action: action) {
       Text(title)
         .font(.system(size: 12, weight: .semibold))
-        .foregroundStyle(isSelected ? .white : DashboardPalette.secondaryText)
+        .foregroundStyle(isSelected ? .white : theme.secondaryText)
         .padding(.horizontal, 16)
         .frame(height: 36)
-        .background(isSelected ? color.opacity(0.72) : DashboardPalette.surface)
+        .background(isSelected ? color.opacity(0.72) : theme.surface)
         .clipShape(Capsule())
-        .overlay(Capsule().stroke(isSelected ? color : DashboardPalette.border, lineWidth: 1))
+        .overlay(Capsule().stroke(isSelected ? color : theme.border, lineWidth: 1))
     }
     .buttonStyle(.plain)
   }
 }
 
 private struct DashboardSummary: View {
+  @Environment(\.dashboardTheme) private var theme
   let account: AccountRecord?
   let snapshot: UsageSnapshot?
   let activeAccountCount: Int
@@ -335,7 +317,7 @@ private struct DashboardSummary: View {
   let lastUpdatedAt: Date?
 
   private var accent: Color {
-    account.map { DashboardPalette.accent(for: $0.provider) } ?? DashboardPalette.purple
+    account.map { theme.accent(for: $0.provider) } ?? theme.primary
   }
 
   private var progress: Double? {
@@ -358,7 +340,7 @@ private struct DashboardSummary: View {
         VStack(alignment: .leading, spacing: 5) {
           Text(account?.label ?? "等待添加账号")
             .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(DashboardPalette.secondaryText)
+            .foregroundStyle(theme.secondaryText)
           Text(primaryValue)
             .font(.system(size: 38, weight: .bold, design: .rounded))
             .foregroundStyle(.white)
@@ -368,7 +350,7 @@ private struct DashboardSummary: View {
         }
         Spacer()
         ZStack {
-          Circle().stroke(DashboardPalette.surfaceRaised, lineWidth: 9)
+          Circle().stroke(theme.surfaceRaised, lineWidth: 9)
           Circle()
             .trim(from: 0, to: progress ?? 0)
             .stroke(accent, style: StrokeStyle(lineWidth: 9, lineCap: .round))
@@ -380,13 +362,13 @@ private struct DashboardSummary: View {
         .frame(width: 82, height: 82)
       }
 
-      Divider().overlay(DashboardPalette.border)
+      Divider().overlay(theme.border)
 
       HStack(spacing: 0) {
         SummaryMetric(value: "\(activeAccountCount)", label: "启用账号")
-        Divider().frame(height: 34).overlay(DashboardPalette.border)
+        Divider().frame(height: 34).overlay(theme.border)
         SummaryMetric(value: "\(providerCount)", label: "平台")
-        Divider().frame(height: 34).overlay(DashboardPalette.border)
+        Divider().frame(height: 34).overlay(theme.border)
         SummaryMetric(
           value: lastUpdatedAt?.formatted(date: .omitted, time: .shortened) ?? "--",
           label: "最近更新"
@@ -394,13 +376,14 @@ private struct DashboardSummary: View {
       }
     }
     .padding(20)
-    .background(DashboardPalette.surface)
+    .background(theme.surface)
     .clipShape(RoundedRectangle(cornerRadius: 8))
-    .overlay(RoundedRectangle(cornerRadius: 8).stroke(DashboardPalette.border, lineWidth: 1))
+    .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.border, lineWidth: 1))
   }
 }
 
 private struct SummaryMetric: View {
+  @Environment(\.dashboardTheme) private var theme
   let value: String
   let label: String
 
@@ -412,34 +395,36 @@ private struct SummaryMetric: View {
         .minimumScaleFactor(0.75)
       Text(label)
         .font(.system(size: 9, weight: .medium))
-        .foregroundStyle(DashboardPalette.secondaryText)
+        .foregroundStyle(theme.secondaryText)
     }
     .frame(maxWidth: .infinity)
   }
 }
 
 private struct EmptyAccountsView: View {
+  @Environment(\.dashboardTheme) private var theme
   let hasAccounts: Bool
 
   var body: some View {
     VStack(spacing: 10) {
       Image(systemName: hasAccounts ? "line.3.horizontal.decrease.circle" : "person.crop.circle.badge.plus")
         .font(.system(size: 28))
-        .foregroundStyle(DashboardPalette.cyan)
+        .foregroundStyle(theme.secondary)
       Text(hasAccounts ? "这个平台还没有账号" : "还没有账号")
         .font(.system(size: 16, weight: .bold))
       Text(hasAccounts ? "切换到其他平台查看" : "点右上角 + 添加账号")
         .font(.system(size: 12))
-        .foregroundStyle(DashboardPalette.secondaryText)
+        .foregroundStyle(theme.secondaryText)
     }
     .frame(maxWidth: .infinity, minHeight: 150)
-    .background(DashboardPalette.surface)
+    .background(theme.surface)
     .clipShape(RoundedRectangle(cornerRadius: 8))
-    .overlay(RoundedRectangle(cornerRadius: 8).stroke(DashboardPalette.border, lineWidth: 1))
+    .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.border, lineWidth: 1))
   }
 }
 
 private struct AccountDashboardCard: View {
+  @Environment(\.dashboardTheme) private var theme
   let account: AccountRecord
   let snapshot: UsageSnapshot?
   let cooldownUntil: Date?
@@ -456,7 +441,7 @@ private struct AccountDashboardCard: View {
   @State private var refreshing = false
   @State private var reauthenticating = false
 
-  private var accent: Color { DashboardPalette.accent(for: account.provider) }
+  private var accent: Color { theme.accent(for: account.provider) }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
@@ -473,12 +458,12 @@ private struct AccountDashboardCard: View {
                 .foregroundStyle(.black)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 3)
-                .background(DashboardPalette.green, in: Capsule())
+                .background(theme.success, in: Capsule())
             }
           }
           Text(account.provider.title)
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(DashboardPalette.secondaryText)
+            .foregroundStyle(theme.secondaryText)
         }
         Spacer()
         CredentialStatusPill(health: health)
@@ -493,12 +478,12 @@ private struct AccountDashboardCard: View {
           Text("等待首次刷新")
         }
         .font(.system(size: 12, weight: .medium))
-        .foregroundStyle(DashboardPalette.secondaryText)
+        .foregroundStyle(theme.secondaryText)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 12)
       }
 
-      Divider().overlay(DashboardPalette.border)
+      Divider().overlay(theme.border)
 
       HStack(spacing: 14) {
         Button {
@@ -527,7 +512,7 @@ private struct AccountDashboardCard: View {
         if !account.isEnabled {
           Text("已隐藏")
             .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(DashboardPalette.orange)
+            .foregroundStyle(theme.warning)
         }
       }
       .font(.system(size: 12, weight: .semibold))
@@ -535,9 +520,9 @@ private struct AccountDashboardCard: View {
       .buttonStyle(.plain)
     }
     .padding(16)
-    .background(DashboardPalette.surface)
+    .background(theme.surface)
     .clipShape(RoundedRectangle(cornerRadius: 8))
-    .overlay(RoundedRectangle(cornerRadius: 8).stroke(DashboardPalette.border, lineWidth: 1))
+    .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.border, lineWidth: 1))
     .opacity(account.isEnabled ? 1 : 0.62)
   }
 
@@ -555,7 +540,7 @@ private struct AccountDashboardCard: View {
       Image(systemName: "ellipsis")
         .font(.system(size: 15, weight: .semibold))
         .frame(width: 30, height: 30)
-        .background(DashboardPalette.surfaceRaised, in: Circle())
+        .background(theme.surfaceRaised, in: Circle())
     }
     .buttonStyle(.plain)
   }
@@ -578,6 +563,7 @@ private struct CredentialStatusPill: View {
 }
 
 private struct SnapshotDashboardBody: View {
+  @Environment(\.dashboardTheme) private var theme
   let snapshot: UsageSnapshot
   let accent: Color
   let cooldownUntil: Date?
@@ -593,14 +579,14 @@ private struct SnapshotDashboardBody: View {
           }
         }
         .font(.system(size: 11, weight: .semibold))
-        .foregroundStyle(statusColor(kind))
+        .foregroundStyle(statusColor(kind, theme: theme))
       }
 
       if let balance = snapshot.balance {
         HStack(alignment: .firstTextBaseline) {
           Text("可用余额")
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(DashboardPalette.secondaryText)
+            .foregroundStyle(theme.secondaryText)
           Spacer()
           Text("\(balance.symbol)\(balance.total, specifier: "%.2f")")
             .font(.system(size: 24, weight: .bold, design: .rounded))
@@ -616,7 +602,7 @@ private struct SnapshotDashboardBody: View {
             VStack(alignment: .leading, spacing: 3) {
               Text(metric.label)
                 .font(.system(size: 10))
-                .foregroundStyle(DashboardPalette.secondaryText)
+                .foregroundStyle(theme.secondaryText)
               Text(metric.value)
                 .font(.system(size: 15, weight: .bold))
             }
@@ -625,14 +611,14 @@ private struct SnapshotDashboardBody: View {
       } else {
         Text("暂无可显示额度")
           .font(.system(size: 12))
-          .foregroundStyle(DashboardPalette.secondaryText)
+          .foregroundStyle(theme.secondaryText)
       }
 
       HStack(spacing: 7) {
         Text("更新 \(snapshot.fetchedAt.formatted(date: .omitted, time: .shortened))")
         if snapshot.stale {
           Text("缓存")
-            .foregroundStyle(DashboardPalette.orange)
+            .foregroundStyle(theme.warning)
         }
         if let plan = snapshot.plan, !plan.isEmpty {
           Text(plan)
@@ -640,7 +626,7 @@ private struct SnapshotDashboardBody: View {
         }
       }
       .font(.system(size: 9, weight: .medium))
-      .foregroundStyle(DashboardPalette.secondaryText)
+      .foregroundStyle(theme.secondaryText)
     }
   }
 
@@ -654,6 +640,7 @@ private struct SnapshotDashboardBody: View {
 }
 
 private struct QuotaWindowRow: View {
+  @Environment(\.dashboardTheme) private var theme
   let window: UsageWindow
   let accent: Color
 
@@ -669,7 +656,7 @@ private struct QuotaWindowRow: View {
       }
       GeometryReader { proxy in
         ZStack(alignment: .leading) {
-          Capsule().fill(DashboardPalette.surfaceRaised)
+          Capsule().fill(theme.surfaceRaised)
           Capsule()
             .fill(progressColor)
             .frame(width: max(5, proxy.size.width * window.remainingPercent / 100))
@@ -683,22 +670,22 @@ private struct QuotaWindowRow: View {
           Text(resetCountdown(reset))
         }
         .font(.system(size: 9, weight: .medium))
-        .foregroundStyle(DashboardPalette.secondaryText)
+        .foregroundStyle(theme.secondaryText)
       }
     }
   }
 
   private var progressColor: Color {
     if window.remainingPercent <= 15 { return .red }
-    if window.remainingPercent <= 35 { return DashboardPalette.orange }
+    if window.remainingPercent <= 35 { return theme.warning }
     return accent
   }
 }
 
-private func statusColor(_ kind: ProviderErrorKind) -> Color {
+private func statusColor(_ kind: ProviderErrorKind, theme: DashboardTheme) -> Color {
   switch kind {
   case .authentication, .configuration: .red
-  case .rateLimited, .providerUnavailable, .network: DashboardPalette.orange
+  case .rateLimited, .providerUnavailable, .network: theme.warning
   case .invalidResponse, .unknown: .yellow
   }
 }
@@ -733,12 +720,22 @@ struct CredentialHealth {
 
 struct SettingsView: View {
   @ObservedObject var model: AppModel
+  @Binding var selectedTheme: DashboardTheme
   @Environment(\.dismiss) private var dismiss
   @State private var autoMinutes = 15
 
   var body: some View {
     NavigationStack {
       Form {
+        Section("外观") {
+          Picker("界面主题", selection: $selectedTheme) {
+            ForEach(DashboardTheme.allCases) { theme in
+              Text(theme.title).tag(theme)
+            }
+          }
+          .pickerStyle(.menu)
+          ThemePreviewRow(theme: selectedTheme)
+        }
         if AppConfig.isAppOnlyBuild {
           Section("刷新") {
             Label("支持单账号刷新、全部刷新和下拉刷新", systemImage: "arrow.clockwise")
@@ -798,7 +795,7 @@ struct SettingsView: View {
         }
       }
       .scrollContentBackground(.hidden)
-      .background(DashboardPalette.background)
+      .background(selectedTheme.background)
       .navigationTitle("设置")
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
@@ -813,6 +810,34 @@ struct SettingsView: View {
           WidgetCenter.shared.reloadAllTimelines()
         }
       }
+      .onChange(of: selectedTheme) { newTheme in
+        Task {
+          await SharedStore.shared.setDashboardTheme(newTheme)
+          WidgetCenter.shared.reloadAllTimelines()
+        }
+      }
     }
+    .environment(\.dashboardTheme, selectedTheme)
+    .preferredColorScheme(selectedTheme.preferredColorScheme)
+  }
+}
+
+private struct ThemePreviewRow: View {
+  let theme: DashboardTheme
+
+  var body: some View {
+    HStack(spacing: 12) {
+      HStack(spacing: 5) {
+        ForEach(Array(theme.previewColors.enumerated()), id: \.offset) { _, color in
+          Circle().fill(color).frame(width: 16, height: 16)
+        }
+      }
+      VStack(alignment: .leading, spacing: 2) {
+        Text(theme.title).font(.system(size: 13, weight: .semibold))
+        Text(theme.subtitle).font(.system(size: 10)).foregroundStyle(theme.secondaryText)
+      }
+      Spacer()
+    }
+    .padding(.vertical, 4)
   }
 }
