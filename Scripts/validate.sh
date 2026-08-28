@@ -20,6 +20,7 @@ ks=Path('Shared/KeychainStore.swift').read_text(encoding='utf-8')
 assert 'discoverDefaultAccessGroup' in ks
 assert 'kSecAttrAccessGroup' in ks
 assert 'credentialQuery' in ks and 'AppConfig.isAppOnlyBuild' in ks
+assert 'AppConfig.isWidgetExtension' in ks
 print('runtime keychain resolution: ok')
 
 models=Path('Shared/Models.swift').read_text(encoding='utf-8')
