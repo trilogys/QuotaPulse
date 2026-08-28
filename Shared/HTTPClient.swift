@@ -15,7 +15,7 @@ private final class ProxyAuthenticationDelegate: NSObject, URLSessionTaskDelegat
     didReceive challenge: URLAuthenticationChallenge,
     completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
   ) {
-    if challenge.protectionSpace.isProxy, !username.isEmpty {
+    if challenge.protectionSpace.isProxy(), !username.isEmpty {
       completionHandler(
         .useCredential,
         URLCredential(user: username, password: password, persistence: .forSession)
