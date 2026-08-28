@@ -71,9 +71,9 @@ private enum WidgetEntryLoader {
   static func itemLimit(for family: WidgetFamily) -> Int {
     switch family {
     case .systemSmall: 1
-    case .systemMedium: 3
-    case .systemLarge: 7
-    default: 3
+    case .systemMedium: 2
+    case .systemLarge: 5
+    default: 2
     }
   }
 }
@@ -179,7 +179,10 @@ struct AIQuotaWidgetView: View {
 
   private var background: some View {
     LinearGradient(
-      colors: [Color.black.opacity(0.94), Color.black.opacity(0.82)],
+      colors: [
+        Color(red: 0.035, green: 0.04, blue: 0.055),
+        Color(red: 0.075, green: 0.055, blue: 0.13),
+      ],
       startPoint: .topLeading,
       endPoint: .bottomTrailing
     )
@@ -190,16 +193,14 @@ struct AIQuotaWidgetView: View {
       interactiveHeader
     } else {
       HStack(spacing: 8) {
-        VStack(alignment: .leading, spacing: 1) {
-          Text("AI 额度").font(.system(size: family == .systemSmall ? 14 : 15, weight: .bold))
+        VStack(alignment: .leading, spacing: 2) {
+          Text("AI QUOTA").font(.system(size: family == .systemSmall ? 13 : 14, weight: .bold))
           if family != .systemSmall {
-            Text("点小组件打开 App 刷新").font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary)
+            Text("额度总览").font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary)
           }
         }
         Spacer(minLength: 4)
-        Image(systemName: "arrow.up.forward.app")
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(.secondary)
+        livePill
       }
     }
   }
@@ -207,13 +208,14 @@ struct AIQuotaWidgetView: View {
   @available(iOS 17.0, *)
   private var interactiveHeader: some View {
     HStack(spacing: 8) {
-      VStack(alignment: .leading, spacing: 1) {
-        Text("AI 额度").font(.system(size: family == .systemSmall ? 14 : 15, weight: .bold))
+      VStack(alignment: .leading, spacing: 2) {
+        Text("AI QUOTA").font(.system(size: family == .systemSmall ? 13 : 14, weight: .bold))
         if family != .systemSmall {
-          Text("点刷新按钮原地刷新").font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary)
+          Text("额度总览").font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary)
         }
       }
       Spacer(minLength: 4)
+      livePill
       if entry.credentialAccessIssue == nil {
         Button(intent: RefreshWidgetSelectionIntent(accountIDs: entry.selectedAccountIDs)) {
           Image(systemName: "arrow.clockwise")
@@ -225,6 +227,17 @@ struct AIQuotaWidgetView: View {
         .accessibilityLabel("刷新当前小组件")
       }
     }
+  }
+
+  private var livePill: some View {
+    HStack(spacing: 4) {
+      Circle().fill(Color.green).frame(width: 5, height: 5)
+      Text("LIVE").font(.system(size: 8, weight: .bold))
+    }
+    .foregroundStyle(.green)
+    .padding(.horizontal, 7)
+    .frame(height: 23)
+    .background(Color.green.opacity(0.12), in: Capsule())
   }
 
   private func signingState(_ reason: String) -> some View {
@@ -256,6 +269,9 @@ struct AIQuotaWidgetView: View {
 
   @ViewBuilder private func accountRow(_ item: WidgetDisplayItem) -> some View {
     HStack(spacing: 8) {
+      Capsule()
+        .fill(providerColor(item.account.provider))
+        .frame(width: 3)
       VStack(alignment: .leading, spacing: 4) {
         HStack(spacing: 5) {
           Text(item.account.label).font(.system(size: 11, weight: .semibold)).lineLimit(1)
@@ -267,7 +283,7 @@ struct AIQuotaWidgetView: View {
           }
         }
         if let snapshot = item.snapshot {
-          snapshotBody(snapshot)
+          snapshotBody(snapshot, provider: item.account.provider)
         } else {
           Text("等待首次刷新").font(.system(size: 9)).foregroundStyle(.secondary)
         }
@@ -279,6 +295,10 @@ struct AIQuotaWidgetView: View {
         }
       }
     }
+    .padding(.horizontal, 8)
+    .padding(.vertical, family == .systemSmall ? 6 : 7)
+    .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 6))
+    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.10), lineWidth: 1))
   }
 
   @available(iOS 17.0, *)
@@ -299,17 +319,21 @@ struct AIQuotaWidgetView: View {
     return "\(base) · \(resetCountdown(until, from: entry.date)) 后重试"
   }
 
-  @ViewBuilder private func snapshotBody(_ snapshot: UsageSnapshot) -> some View {
+  @ViewBuilder private func snapshotBody(_ snapshot: UsageSnapshot, provider: ProviderID) -> some View {
     if let balance = snapshot.balance {
       HStack(spacing: 6) {
         Text("余额").foregroundStyle(.secondary)
-        Text("\(balance.symbol)\(balance.total, specifier: "%.2f")").fontWeight(.bold)
+        Text("\(balance.symbol)\(balance.total, specifier: "%.2f")")
+          .fontWeight(.bold)
+          .foregroundStyle(providerColor(provider))
         if !balance.available { Text("不可用").foregroundStyle(.red) }
       }
       .font(.system(size: 10))
     } else if !snapshot.windows.isEmpty {
       HStack(spacing: family == .systemSmall ? 5 : 8) {
-        ForEach(Array(snapshot.windows.prefix(family == .systemSmall ? 2 : 3))) { quotaPill($0) }
+        ForEach(Array(snapshot.windows.prefix(family == .systemSmall ? 2 : 3))) {
+          quotaPill($0, provider: provider)
+        }
       }
     } else if !snapshot.metrics.isEmpty {
       HStack(spacing: 8) {
@@ -329,7 +353,7 @@ struct AIQuotaWidgetView: View {
     }
   }
 
-  private func quotaPill(_ window: UsageWindow) -> some View {
+  private func quotaPill(_ window: UsageWindow, provider: ProviderID) -> some View {
     VStack(alignment: .leading, spacing: 2) {
       HStack(spacing: 2) {
         Text(window.label).foregroundStyle(.secondary)
@@ -340,7 +364,7 @@ struct AIQuotaWidgetView: View {
         ZStack(alignment: .leading) {
           Capsule().fill(Color.secondary.opacity(0.18))
           Capsule()
-            .fill(progressColor(window.remainingPercent))
+            .fill(progressColor(window.remainingPercent, provider: provider))
             .frame(width: max(2, proxy.size.width * window.remainingPercent / 100))
         }
       }
@@ -389,10 +413,22 @@ struct AIQuotaWidgetView: View {
     return "\(max(1, minutes))m"
   }
 
-  private func progressColor(_ remaining: Double) -> Color {
+  private func progressColor(_ remaining: Double, provider: ProviderID) -> Color {
     if remaining <= 15 { return .red }
     if remaining <= 35 { return .orange }
-    return .green
+    return providerColor(provider)
+  }
+
+  private func providerColor(_ provider: ProviderID) -> Color {
+    switch provider {
+    case .codex: Color(red: 0.49, green: 0.20, blue: 0.96)
+    case .claude: Color(red: 0.94, green: 0.39, blue: 0.18)
+    case .kimi: Color(red: 0.20, green: 0.78, blue: 0.45)
+    case .deepseek: Color(red: 0.25, green: 0.82, blue: 0.80)
+    case .minimax: Color(red: 0.95, green: 0.65, blue: 0.18)
+    case .glm: Color(red: 0.30, green: 0.53, blue: 0.98)
+    case .copilot: Color(red: 0.78, green: 0.45, blue: 0.92)
+    }
   }
 }
 
