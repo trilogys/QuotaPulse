@@ -18,7 +18,7 @@ class AccountStore(context: Context) {
     fun setCooldown(accountId:String,untilEpochSeconds:Long){prefs.edit().putLong("cooldown.$accountId",untilEpochSeconds).apply()}
     fun cooldownUntil(accountId:String):Long?=prefs.getLong("cooldown.$accountId",0).takeIf{it>System.currentTimeMillis()/1000}
     fun clearCooldown(accountId:String){prefs.edit().remove("cooldown.$accountId").apply()}
-    private fun normalizeOrder(items:List<AccountRecord>):List<AccountRecord>=items.mapIndexed{index,account->account.copy(order=index)}
+    private fun normalizeOrder(items:List<AccountRecord>):List<AccountRecord> = items.mapIndexed{index,account->account.copy(order=index)}
     private fun saveAccounts(items:List<AccountRecord>){val array=JSONArray();items.forEach{a->array.put(JSONObject().put("id",a.id).put("provider",a.provider.name).put("name",a.name).put("enabled",a.enabled).put("order",a.order).putNullable("providerAccountId",a.providerAccountId).put("createdAt",a.createdAtEpochSeconds))};prefs.edit().putString("accounts",array.toString()).apply()}
     private fun JSONObject.putNullable(key:String,value:Any?):JSONObject=put(key,value ?: JSONObject.NULL)
     private fun JSONObject.stringOrNull(key:String):String?=if(!has(key)||isNull(key))null else optString(key).takeIf{it.isNotBlank()}
