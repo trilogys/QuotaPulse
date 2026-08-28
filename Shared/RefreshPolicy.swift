@@ -66,8 +66,8 @@ extension SharedStore {
         accountID: account.id,
         provider: account.provider,
         errorMessage: failure.message,
-        stale: true,
-        errorKind: failure.kind
+        errorKind: failure.kind,
+        stale: true
       ))
     } else {
       markSnapshotStale(accountID: account.id, message: failure.message, kind: failure.kind)
