@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import UIKit
 import WidgetKit
@@ -342,7 +343,7 @@ private struct DashboardSummary: View {
   }
 
   private var primaryValue: String {
-    if let balance = snapshot?.balance { return "\(balance.symbol)\(balance.total, specifier: "%.2f")" }
+    if let balance = snapshot?.balance { return "\(balance.symbol)\(String(format: "%.2f", balance.total))" }
     if let progress { return "\(Int((progress * 100).rounded()))%" }
     return "--"
   }
