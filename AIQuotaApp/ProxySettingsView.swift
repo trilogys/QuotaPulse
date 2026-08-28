@@ -201,7 +201,7 @@ struct ProxySettingsView: View {
         }
       }
 
-      Section("已创建代理") {
+      Section {
         if profiles.isEmpty {
           Text("尚未创建代理")
             .foregroundStyle(.secondary)
@@ -210,6 +210,8 @@ struct ProxySettingsView: View {
             proxyRow(profile)
           }
         }
+      } header: {
+        Text("已创建代理")
       } footer: {
         Text("代理用于所选服务的额度查询、Token 刷新和测速。iOS 16 的系统 OAuth 登录页仍遵循系统网络。")
       }
