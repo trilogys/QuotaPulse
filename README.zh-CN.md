@@ -120,6 +120,8 @@ P12 模式需要：`.p12` + 密码、主 App `.mobileprovision`、Widget `.mobil
 - Kimi device headers 持久化
 - DeepSeek API Key 查询余额
 - 多账号 UUID 隔离
+- 与 iOS 对齐的明亮、霓虹夜、石墨、极光四套主题，默认明亮
+- Provider 筛选、总览圆环、圆角额度卡片与平台独立强调色
 - 凭据健康状态与原账号重新认证覆盖模式
 - Reset 倒计时
 - EncryptedSharedPreferences + Android Keystore 保存敏感凭据

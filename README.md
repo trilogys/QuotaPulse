@@ -94,6 +94,8 @@ Android currently includes:
 - Codex, Claude, and Kimi OAuth flows
 - API Key modes for Codex / OpenAI, Claude, Kimi, and other supported providers
 - Multiple accounts and encrypted credential storage
+- Four switchable dashboard themes matching iOS, with Daylight as the default
+- Provider filters, overview rings, rounded quota cards, and per-provider accent colors
 - Background WorkManager refresh
 - Configurable home-screen widgets
 - Account ordering, enable/disable state, recommendations, and stale-cache handling

@@ -81,18 +81,29 @@ android_models=Path('android/app/src/main/java/com/trilogys/aiquota/core/Models.
 android_usage=Path('android/app/src/main/java/com/trilogys/aiquota/core/UsageService.kt').read_text(encoding='utf-8')
 android_ui=Path('android/app/src/main/java/com/trilogys/aiquota/MainActivity.kt').read_text(encoding='utf-8')
 android_portable_ui=Path('android/app/src/main/java/com/trilogys/aiquota/PortableConfigUi.kt').read_text(encoding='utf-8')
+android_theme=Path('android/app/src/main/java/com/trilogys/aiquota/ui/QuotaPulseTheme.kt').read_text(encoding='utf-8')
+android_gradle=Path('android/app/build.gradle.kts').read_text(encoding='utf-8')
 import xml.etree.ElementTree as ET
 assert 'CredentialAuthenticationMode' in android_models and 'connectionLabel' in android_models
 assert all(value in android_usage for value in ['fetchOpenAIKey', 'fetchClaudeKey', 'fetchKimiKey'])
 assert 'availableModels=models' in android_usage and 'availableModels' in android_models
 assert 'modelIds(body)' in android_usage and 'request("models")' in android_usage
-assert 'CredentialAuthenticationMode.API_KEY' in android_ui and 'snapshot?.connectionLabel' in android_ui
+assert 'CredentialAuthenticationMode.API_KEY' in android_ui and 'snapshot.connectionLabel' in android_ui
 assert 'R.string.available_models' in android_ui
+assert all(value in android_ui for value in ['DashboardOverviewCard', 'AccountDashboardCard', 'ProviderFilterBar', 'AccountEditorSheet', 'SettingsSheet'])
+assert all(value in android_theme for value in ['DAYLIGHT', 'NEON', 'GRAPHITE', 'AURORA', 'DashboardThemePreferences', 'LocalDashboardPalette'])
+assert 'DashboardThemeOption.DAYLIGHT.name' in android_theme
+assert 'material-icons-extended' in android_gradle
+assert max(map(len, android_ui.splitlines())) < 180
 assert 'QuotaPulse-backup-' in android_portable_ui and 'yyyyMMdd-HHmmss' in android_portable_ui
-for strings in [Path('android/app/src/main/res/values/strings.xml'), Path('android/app/src/main/res/values-zh-rCN/strings.xml')]:
+android_string_files=[Path('android/app/src/main/res/values/strings.xml'), Path('android/app/src/main/res/values-zh-rCN/strings.xml')]
+android_string_sets=[]
+for strings in android_string_files:
     root=ET.parse(strings).getroot()
     values={item.attrib.get('name'): item.text for item in root.findall('string')}
+    android_string_sets.append(set(values))
     assert values.get('access_token') == 'Access Token / API Key', strings
+assert android_string_sets[0] == android_string_sets[1]
 print('Android OAuth / API key modes: ok')
 
 assets=Path('AIQuotaApp/Assets.xcassets')
