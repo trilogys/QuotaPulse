@@ -8,5 +8,5 @@
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen"
     android:initialLayout="@layout/glance_default_loading_layout"
-    android:configure="com.trilogys.aiquota.widget.WidgetConfigActivity"
+    android:configure="com.trilogys.quotapulse.widget.WidgetConfigActivity"
     android:widgetFeatures="reconfigurable" />

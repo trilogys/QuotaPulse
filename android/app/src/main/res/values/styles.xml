@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.AIQuota" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.QuotaPulse" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>

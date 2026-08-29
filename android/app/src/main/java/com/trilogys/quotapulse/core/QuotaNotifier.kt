@@ -1,4 +1,4 @@
-package com.trilogys.aiquota.core
+package com.trilogys.quotapulse.core
 
 import android.Manifest
 import android.app.Notification
@@ -10,7 +10,7 @@ import android.os.Build
 import kotlin.math.roundToInt
 
 class QuotaNotifier(private val context: Context) {
-    private val prefs = context.getSharedPreferences("aiquota_alert_state", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("quotapulse_alert_state", Context.MODE_PRIVATE)
     private val manager = context.getSystemService(NotificationManager::class.java)
 
     fun evaluate(account: AccountRecord, snapshot: UsageSnapshot) {

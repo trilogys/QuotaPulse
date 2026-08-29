@@ -1,4 +1,4 @@
-package com.trilogys.aiquota.ui
+package com.trilogys.quotapulse.ui
 
 import android.app.Activity
 import android.content.Context
@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import com.trilogys.aiquota.core.ProviderId
+import com.trilogys.quotapulse.core.ProviderId
 
 enum class DashboardThemeOption {
     DAYLIGHT,

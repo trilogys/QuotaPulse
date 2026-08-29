@@ -1,4 +1,4 @@
-name: AIQuota
+name: QuotaPulse
 options:
   bundleIdPrefix: com.example
   deploymentTarget:
@@ -14,11 +14,11 @@ settings:
   base:
     SWIFT_VERSION: 5.9
     IPHONEOS_DEPLOYMENT_TARGET: 16.0
-    DEVELOPMENT_TEAM: $(AIQUOTA_TEAM_ID)
-    CODE_SIGN_STYLE: $(AIQUOTA_CODE_SIGN_STYLE)
+    DEVELOPMENT_TEAM: $(QUOTAPULSE_TEAM_ID)
+    CODE_SIGN_STYLE: $(QUOTAPULSE_CODE_SIGN_STYLE)
 
 targets:
-  AIQuotaApp:
+  QuotaPulseApp:
     type: application
     platform: iOS
     sources:
@@ -26,22 +26,22 @@ targets:
         excludes:
           - RefreshIntents.swift
           - WidgetConfigurationIntent.swift
-      - path: AIQuotaApp
+      - path: QuotaPulseApp
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(AIQUOTA_APP_BUNDLE_ID)
-        PROVISIONING_PROFILE_SPECIFIER: $(AIQUOTA_APP_PROFILE_SPECIFIER)
+        PRODUCT_BUNDLE_IDENTIFIER: $(QUOTAPULSE_APP_BUNDLE_ID)
+        PROVISIONING_PROFILE_SPECIFIER: $(QUOTAPULSE_APP_PROFILE_SPECIFIER)
         INFOPLIST_KEY_CFBundleDisplayName: QuotaPulse
-        INFOPLIST_KEY_AIQuotaSingleProfile: true
+        INFOPLIST_KEY_QuotaPulseSingleProfile: true
         INFOPLIST_KEY_UILaunchScreen_Generation: true
         GENERATE_INFOPLIST_FILE: true
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIconClassic AppIconNight"
         ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: true
     info:
-      path: AIQuotaApp/Info.plist
+      path: QuotaPulseApp/Info.plist
       properties:
-        AIQuotaSingleProfile: true
+        QuotaPulseSingleProfile: true
         BGTaskSchedulerPermittedIdentifiers:
           - com.trilogys.quotapulse.refresh
         UIBackgroundModes:
@@ -56,15 +56,15 @@ targets:
             CFBundleTypeExtensions:
               - json
         CFBundleURLTypes:
-          - CFBundleURLName: AIQuota
+          - CFBundleURLName: QuotaPulse
             CFBundleURLSchemes:
-              - aiquota
+              - quotapulse
 
 schemes:
-  AIQuotaApp:
+  QuotaPulseApp:
     build:
       targets:
-        AIQuotaApp: all
+        QuotaPulseApp: all
     run:
       config: Debug
     archive:

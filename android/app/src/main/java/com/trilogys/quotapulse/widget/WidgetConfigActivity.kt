@@ -1,4 +1,4 @@
-package com.trilogys.aiquota.widget
+package com.trilogys.quotapulse.widget
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
@@ -29,9 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.glance.appwidget.updateAll
-import com.trilogys.aiquota.R
-import com.trilogys.aiquota.core.AccountStore
-import com.trilogys.aiquota.core.ProviderId
+import com.trilogys.quotapulse.R
+import com.trilogys.quotapulse.core.AccountStore
+import com.trilogys.quotapulse.core.ProviderId
 import kotlinx.coroutines.launch
 
 class WidgetConfigActivity : ComponentActivity() {
@@ -143,7 +143,7 @@ class WidgetConfigActivity : ComponentActivity() {
                             configStore.save(appWidgetId, config)
                             val result = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                             setResult(Activity.RESULT_OK, result)
-                            scope.launch { AIQuotaWidget().updateAll(this@WidgetConfigActivity) }
+                            scope.launch { QuotaPulseWidget().updateAll(this@WidgetConfigActivity) }
                             finish()
                         }
                     ) { Text(stringResource(R.string.save)) }

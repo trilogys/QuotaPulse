@@ -1,10 +1,10 @@
-package com.trilogys.aiquota.widget
+package com.trilogys.quotapulse.widget
 
 import android.content.Context
-import com.trilogys.aiquota.core.ProviderId
+import com.trilogys.quotapulse.core.ProviderId
 
 class WidgetConfigStore(context: Context) {
-    private val prefs = context.getSharedPreferences("aiquota_widget_config", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("quotapulse_widget_config", Context.MODE_PRIVATE)
 
     data class Config(
         val mode: Mode = Mode.ALL,

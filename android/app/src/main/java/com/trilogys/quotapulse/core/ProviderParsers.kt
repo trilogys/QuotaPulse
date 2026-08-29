@@ -1,4 +1,4 @@
-package com.trilogys.aiquota.core
+package com.trilogys.quotapulse.core
 
 import org.json.JSONObject
 import kotlin.math.max

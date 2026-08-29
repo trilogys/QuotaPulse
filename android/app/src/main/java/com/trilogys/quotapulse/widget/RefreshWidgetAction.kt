@@ -1,4 +1,4 @@
-package com.trilogys.aiquota.widget
+package com.trilogys.quotapulse.widget
 
 import android.content.Context
 import androidx.glance.GlanceId
@@ -12,7 +12,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
-import com.trilogys.aiquota.work.QuotaRefreshWorker
+import com.trilogys.quotapulse.work.QuotaRefreshWorker
 import java.util.concurrent.TimeUnit
 
 class RefreshWidgetAction : ActionCallback {
@@ -23,6 +23,6 @@ class RefreshWidgetAction : ActionCallback {
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
-        WorkManager.getInstance(context).enqueueUniqueWork("aiquota-widget-refresh-${appWidgetId ?: "all"}", ExistingWorkPolicy.REPLACE, request)
+        WorkManager.getInstance(context).enqueueUniqueWork("quotapulse-widget-refresh-${appWidgetId ?: "all"}", ExistingWorkPolicy.REPLACE, request)
     }
 }

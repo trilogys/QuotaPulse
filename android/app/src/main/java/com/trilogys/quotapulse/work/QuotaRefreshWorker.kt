@@ -1,12 +1,12 @@
-package com.trilogys.aiquota.work
+package com.trilogys.quotapulse.work
 
 import android.content.Context
 import androidx.glance.appwidget.updateAll
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.trilogys.aiquota.core.*
-import com.trilogys.aiquota.widget.AIQuotaWidget
-import com.trilogys.aiquota.widget.WidgetConfigStore
+import com.trilogys.quotapulse.core.*
+import com.trilogys.quotapulse.widget.QuotaPulseWidget
+import com.trilogys.quotapulse.widget.WidgetConfigStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -21,7 +21,7 @@ class QuotaRefreshWorker(appContext: Context, params: WorkerParameters) : Corout
             if(manual)store.clearCooldown(account.id)
             runCatching{service.refresh(account)}.onSuccess{store.clearCooldown(account.id);store.saveSnapshot(it.copy(stale=false,errorMessage=null,errorKind=null));notifier.evaluate(account,it);success=true}.onFailure{error->val failure=classifyFailure(error);store.markStale(account.id,failure.message,failure.kind);failure.cooldownSeconds?.let{store.setCooldown(account.id,System.currentTimeMillis()/1000+it)};if(failure.retryable)retryable=true}
         }
-        AIQuotaWidget().updateAll(applicationContext)
+        QuotaPulseWidget().updateAll(applicationContext)
         when{targets.isEmpty()||success->Result.success();retryable&&runAttemptCount<MAX_RETRY_ATTEMPTS->Result.retry();else->Result.success()}
     }
     private fun classifyFailure(error:Throwable):RefreshFailure{val raw=error.message.orEmpty();val lower=raw.lowercase();val status=HTTP_STATUS_REGEX.find(raw)?.groupValues?.getOrNull(1)?.toIntOrNull();return when{
