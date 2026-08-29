@@ -20,7 +20,7 @@ final class LoopbackOAuthServer: @unchecked Sendable {
 
   private let port: NWEndpoint.Port
   var rawPort: UInt16 { port.rawValue }
-  private let queue = DispatchQueue(label: "AIQuota.LoopbackOAuthServer")
+  private let queue = DispatchQueue(label: "QuotaPulse.LoopbackOAuthServer")
   private let lock = NSLock()
   private var listener: NWListener?
   private var readyContinuation: CheckedContinuation<Void, Error>?

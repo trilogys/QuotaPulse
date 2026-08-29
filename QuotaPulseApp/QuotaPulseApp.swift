@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct AIQuotaApp: App {
+struct QuotaPulseApp: App {
   @UIApplicationDelegateAdaptor(QuotaPulseAppDelegate.self) private var appDelegate
 
   var body: some Scene {
