@@ -1355,244 +1355,305 @@ struct SettingsView: View {
 
   var body: some View {
     NavigationStack {
-      Form {
-        Section("外观") {
-          Picker("界面主题", selection: $selectedTheme) {
-            ForEach(DashboardTheme.allCases) { theme in
-              Text(theme.title).tag(theme)
-            }
-          }
-          .pickerStyle(.menu)
-          ThemePreviewRow(theme: selectedTheme)
-        }
-        Section("App 图标") {
-          AppIconPicker(
-            selection: selectedAppIcon,
-            isChanging: isChangingAppIcon,
-            onSelect: selectAppIcon
-          )
-          if !UIApplication.shared.supportsAlternateIcons {
-            Text("当前设备或安装方式不支持切换 App 图标。")
-              .font(.footnote)
-              .foregroundStyle(.secondary)
-          }
-          if let appIconError {
-            Text("切换失败：\(appIconError)")
-              .font(.footnote)
-              .foregroundStyle(.red)
-          }
-        }
-        Section("网络") {
-          NavigationLink {
-            ProxySettingsView()
-          } label: {
-            Label("HTTP / SOCKS5 代理", systemImage: "network")
-          }
-        }
-        Section("走势图") {
-          Toggle("全部页合并走势图", isOn: $aggregateHistory)
-          Group {
-            if aggregateHistory {
-              Text("“全部”页会在一张图中叠加各平台曲线；余额类数据仍单独展示。")
-            } else {
-              Text("“全部”页按平台分别展示走势图。")
-            }
-          }
-          .font(.footnote)
-          .foregroundStyle(.secondary)
-        }
-        Section("总览自动刷新") {
-          Picker("前台刷新间隔", selection: $overviewAutoRefreshSeconds) {
-            Text("关闭").tag(0)
-            Text("30 秒").tag(30)
-            Text("1 分钟").tag(60)
-            Text("5 分钟").tag(300)
-            Text("10 分钟").tag(600)
-          }
-          .pickerStyle(.menu)
-          Text("仅在 QuotaPulse 位于前台时定时刷新；进入后台后停止，并遵守账号冷却时间。")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-        Section("后台刷新") {
-          Toggle("允许后台刷新", isOn: $backgroundRefreshEnabled)
-          if backgroundRefreshEnabled {
-            Picker("最早刷新间隔", selection: $refreshIntervalPreset) {
-              Text("10 分钟").tag(10)
-              Text("15 分钟").tag(15)
-              Text("30 分钟").tag(30)
-              Text("1 小时").tag(60)
-              Text("2 小时").tag(120)
-              Text("自定义").tag(-1)
-            }
-            if refreshIntervalPreset == -1 {
-              Stepper(
-                "自定义：\(customRefreshMinutes) 分钟",
-                value: $customRefreshMinutes,
-                in: 10...1_440,
-                step: 5
-              )
-            }
-          }
-          Text("App 未被划掉时会向 iOS 申请后台刷新；具体执行时刻由系统根据电量、网络和使用习惯调度。")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-        Section("数据") {
-          NavigationLink {
-            BackupSettingsView(model: model)
-          } label: {
-            Label("导入与导出", systemImage: "arrow.up.arrow.down.square")
-          }
-          Text("配置文件可在 iOS 与 Android 之间共用。完整备份可包含登录凭据。")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-          Button(role: .destructive) {
-            confirmingHistoryClear = true
-          } label: {
-            Label("清除本机走势历史", systemImage: "trash")
-          }
-          .disabled(model.usageHistory.isEmpty)
-        }
-        Section("在线更新") {
-          Button {
-            checkForUpdate()
-          } label: {
-            HStack {
-              Label(checkingForUpdate ? "正在检查" : "检查更新", systemImage: "arrow.down.app")
-              Spacer()
-              if checkingForUpdate { ProgressView() }
-            }
-          }
-          .disabled(checkingForUpdate)
-          Text("可检查 GitHub Release；第三方签名安装仍需下载 IPA 后重新签名。")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-        Section("隐私与本机存储") {
-          Label("配置仅保存在本机", systemImage: "lock.shield")
-          Text("账号配置和走势图保存在本机；Token 与 API Key 由系统 Keychain 保护。QuotaPulse 未在程序中使用自建服务器。")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-        Section("版本与兼容性") {
-          if AppConfig.isAppOnlyBuild {
-            Label("单 App 兼容版", systemImage: "iphone")
-          } else {
-            Label("App + Widget 完整版", systemImage: "rectangle.stack.badge.person.crop")
-          }
-          LabeledContent("系统要求", value: "iOS 16+")
-          if AppConfig.isAppOnlyBuild {
-            Text("当前安装包不包含桌面小组件，适合只有一套 P12 / 描述文件或使用第三方重签工具的场景。")
-              .font(.footnote)
-              .foregroundStyle(.secondary)
-          }
-        }
-        Section("凭据状态") {
-          ForEach(model.accounts) { account in
-            let health = model.credentialHealth(account)
-            HStack {
-              VStack(alignment: .leading) {
-                Text(account.label)
-                Text(account.provider.title).font(.caption).foregroundStyle(.secondary)
-              }
-              Spacer()
-              Label(health.title, systemImage: health.icon)
-                .foregroundStyle(health.color)
-                .font(.caption)
-            }
-          }
-        }
-        Section("账号参与范围") {
-          ForEach(model.accounts) { account in
-            Toggle(
-              account.label,
-              isOn: Binding(
-                get: { account.isEnabled },
-                set: { value in Task { await model.setEnabled(account, enabled: value) } }
-              )
-            )
-          }
-          Text("停用后不参与全部刷新、推荐账号和桌面小组件，但仍保留在账号列表，可单独刷新或重新启用。")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-      }
-      .scrollContentBackground(.hidden)
-      .background(selectedTheme.background)
-      .navigationTitle("设置")
-      .alert("清除走势历史？", isPresented: $confirmingHistoryClear) {
-        Button("取消", role: .cancel) {}
-        Button("清除", role: .destructive) {
-          Task { await model.clearUsageHistory() }
-        }
-      } message: {
-        Text("只会删除本机统计记录，不会删除账号或登录凭据。")
-      }
-      .alert("在线更新", isPresented: Binding(get: { updateMessage != nil }, set: { if !$0 { updateMessage = nil } })) {
-        if let update = availableUpdate {
-          Button("打开发布页") { openURL(update.releaseURL) }
-        }
-        Button("好", role: .cancel) {
-          updateMessage = nil
-          availableUpdate = nil
-        }
-      } message: {
-        Text(updateMessage ?? "")
-      }
-      .toolbar {
-        ToolbarItem(placement: .confirmationAction) {
-          Button("完成") { dismiss() }
-        }
-      }
-      .task {
-        let savedMinutes = await SharedStore.shared.autoRefreshMinutes()
-        autoMinutes = savedMinutes
-        if [10, 15, 30, 60, 120].contains(savedMinutes) {
-          refreshIntervalPreset = savedMinutes
-        } else {
-          refreshIntervalPreset = -1
-          customRefreshMinutes = savedMinutes
-        }
-        backgroundRefreshEnabled = await SharedStore.shared.backgroundRefreshEnabled()
-        selectedAppIcon = AppIconChoice.resolve(
-          alternateIconName: UIApplication.shared.alternateIconName
-        )
-      }
-      .onChange(of: autoMinutes) { newValue in
-        Task {
-          await SharedStore.shared.setAutoRefreshMinutes(newValue)
-          WidgetCenter.shared.reloadAllTimelines()
-          if backgroundRefreshEnabled { BackgroundRefreshManager.scheduleIfEnabled() }
-        }
-      }
-      .onChange(of: refreshIntervalPreset) { preset in
-        autoMinutes = preset > 0 ? preset : customRefreshMinutes
-      }
-      .onChange(of: customRefreshMinutes) { minutes in
-        if refreshIntervalPreset == -1 { autoMinutes = minutes }
-      }
-      .onChange(of: backgroundRefreshEnabled) { enabled in
-        Task {
-          await SharedStore.shared.setBackgroundRefreshEnabled(enabled)
-          BackgroundRefreshManager.setEnabled(enabled)
-        }
-      }
-      .onChange(of: selectedTheme) { newTheme in
-        Task {
-          await SharedStore.shared.setDashboardTheme(newTheme)
-          WidgetCenter.shared.reloadAllTimelines()
-        }
-      }
-      .onChange(of: aggregateHistory) { enabled in
-        Task { await SharedStore.shared.setAggregateHistory(enabled) }
-      }
-      .onChange(of: overviewAutoRefreshSeconds) { seconds in
-        Task { await SharedStore.shared.setOverviewAutoRefreshSeconds(seconds) }
-      }
+      settingsForm
     }
     .environment(\.dashboardTheme, selectedTheme)
     .preferredColorScheme(selectedTheme.preferredColorScheme)
+  }
+
+  private var settingsForm: some View {
+    Form {
+      appearanceSection
+      appIconSection
+      networkSection
+      chartSection
+      overviewRefreshSection
+      backgroundRefreshSection
+      dataSection
+      updateSection
+      privacySection
+      compatibilitySection
+      credentialSection
+      accountScopeSection
+    }
+    .scrollContentBackground(.hidden)
+    .background(selectedTheme.background)
+    .navigationTitle("设置")
+    .alert("清除走势历史？", isPresented: $confirmingHistoryClear) {
+      Button("取消", role: .cancel) {}
+      Button("清除", role: .destructive) {
+        Task { await model.clearUsageHistory() }
+      }
+    } message: {
+      Text("只会删除本机统计记录，不会删除账号或登录凭据。")
+    }
+    .alert(
+      "在线更新",
+      isPresented: Binding(
+        get: { updateMessage != nil },
+        set: { if !$0 { updateMessage = nil } }
+      )
+    ) {
+      if let update = availableUpdate {
+        Button("打开发布页") { openURL(update.releaseURL) }
+      }
+      Button("好", role: .cancel) {
+        updateMessage = nil
+        availableUpdate = nil
+      }
+    } message: {
+      Text(updateMessage ?? "")
+    }
+    .toolbar {
+      ToolbarItem(placement: .confirmationAction) {
+        Button("完成") { dismiss() }
+      }
+    }
+    .task { await loadSettings() }
+    .onChange(of: autoMinutes, perform: saveAutoRefreshMinutes)
+    .onChange(of: refreshIntervalPreset) { preset in
+      autoMinutes = preset > 0 ? preset : customRefreshMinutes
+    }
+    .onChange(of: customRefreshMinutes) { minutes in
+      if refreshIntervalPreset == -1 { autoMinutes = minutes }
+    }
+    .onChange(of: backgroundRefreshEnabled, perform: saveBackgroundRefresh)
+    .onChange(of: selectedTheme, perform: saveTheme)
+    .onChange(of: aggregateHistory) { enabled in
+      Task { await SharedStore.shared.setAggregateHistory(enabled) }
+    }
+    .onChange(of: overviewAutoRefreshSeconds) { seconds in
+      Task { await SharedStore.shared.setOverviewAutoRefreshSeconds(seconds) }
+    }
+  }
+
+  private var appearanceSection: some View {
+    Section("外观") {
+      Picker("界面主题", selection: $selectedTheme) {
+        ForEach(DashboardTheme.allCases) { theme in
+          Text(theme.title).tag(theme)
+        }
+      }
+      .pickerStyle(.menu)
+      ThemePreviewRow(theme: selectedTheme)
+    }
+  }
+
+  private var appIconSection: some View {
+    Section("App 图标") {
+      AppIconPicker(
+        selection: selectedAppIcon,
+        isChanging: isChangingAppIcon,
+        onSelect: selectAppIcon
+      )
+      if !UIApplication.shared.supportsAlternateIcons {
+        Text("当前设备或安装方式不支持切换 App 图标。")
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+      }
+      if let appIconError {
+        Text("切换失败：\(appIconError)")
+          .font(.footnote)
+          .foregroundStyle(.red)
+      }
+    }
+  }
+
+  private var networkSection: some View {
+    Section("网络") {
+      NavigationLink {
+        ProxySettingsView()
+      } label: {
+        Label("HTTP / SOCKS5 代理", systemImage: "network")
+      }
+    }
+  }
+
+  private var chartSection: some View {
+    Section("走势图") {
+      Toggle("全部页合并走势图", isOn: $aggregateHistory)
+      Text(
+        aggregateHistory
+          ? "“全部”页会在一张图中叠加各平台曲线；余额类数据仍单独展示。"
+          : "“全部”页按平台分别展示走势图。"
+      )
+      .font(.footnote)
+      .foregroundStyle(.secondary)
+    }
+  }
+
+  private var overviewRefreshSection: some View {
+    Section("总览自动刷新") {
+      Picker("前台刷新间隔", selection: $overviewAutoRefreshSeconds) {
+        Text("关闭").tag(0)
+        Text("30 秒").tag(30)
+        Text("1 分钟").tag(60)
+        Text("5 分钟").tag(300)
+        Text("10 分钟").tag(600)
+      }
+      .pickerStyle(.menu)
+      Text("仅在 QuotaPulse 位于前台时定时刷新；进入后台后停止，并遵守账号冷却时间。")
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private var backgroundRefreshSection: some View {
+    Section("后台刷新") {
+      Toggle("允许后台刷新", isOn: $backgroundRefreshEnabled)
+      if backgroundRefreshEnabled {
+        Picker("最早刷新间隔", selection: $refreshIntervalPreset) {
+          Text("10 分钟").tag(10)
+          Text("15 分钟").tag(15)
+          Text("30 分钟").tag(30)
+          Text("1 小时").tag(60)
+          Text("2 小时").tag(120)
+          Text("自定义").tag(-1)
+        }
+        if refreshIntervalPreset == -1 {
+          Stepper(
+            "自定义：\(customRefreshMinutes) 分钟",
+            value: $customRefreshMinutes,
+            in: 10...1_440,
+            step: 5
+          )
+        }
+      }
+      Text("App 未被划掉时会向 iOS 申请后台刷新；具体执行时刻由系统根据电量、网络和使用习惯调度。")
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private var dataSection: some View {
+    Section("数据") {
+      NavigationLink {
+        BackupSettingsView(model: model)
+      } label: {
+        Label("导入与导出", systemImage: "arrow.up.arrow.down.square")
+      }
+      Text("配置文件可在 iOS 与 Android 之间共用。完整备份可包含登录凭据。")
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+      Button(role: .destructive) {
+        confirmingHistoryClear = true
+      } label: {
+        Label("清除本机走势历史", systemImage: "trash")
+      }
+      .disabled(model.usageHistory.isEmpty)
+    }
+  }
+
+  private var updateSection: some View {
+    Section("在线更新") {
+      Button(action: checkForUpdate) {
+        HStack {
+          Label(checkingForUpdate ? "正在检查" : "检查更新", systemImage: "arrow.down.app")
+          Spacer()
+          if checkingForUpdate { ProgressView() }
+        }
+      }
+      .disabled(checkingForUpdate)
+      Text("可检查 GitHub Release；第三方签名安装仍需下载 IPA 后重新签名。")
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private var privacySection: some View {
+    Section("隐私与本机存储") {
+      Label("配置仅保存在本机", systemImage: "lock.shield")
+      Text("账号配置和走势图保存在本机；Token 与 API Key 由系统 Keychain 保护。QuotaPulse 未在程序中使用自建服务器。")
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private var compatibilitySection: some View {
+    Section("版本与兼容性") {
+      Label(
+        AppConfig.isAppOnlyBuild ? "单 App 兼容版" : "App + Widget 完整版",
+        systemImage: AppConfig.isAppOnlyBuild ? "iphone" : "rectangle.stack.badge.person.crop"
+      )
+      LabeledContent("系统要求", value: "iOS 16+")
+      if AppConfig.isAppOnlyBuild {
+        Text("当前安装包不包含桌面小组件，适合只有一套 P12 / 描述文件或使用第三方重签工具的场景。")
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  private var credentialSection: some View {
+    Section("凭据状态") {
+      ForEach(model.accounts) { account in
+        let health = model.credentialHealth(account)
+        HStack {
+          VStack(alignment: .leading) {
+            Text(account.label)
+            Text(account.provider.title).font(.caption).foregroundStyle(.secondary)
+          }
+          Spacer()
+          Label(health.title, systemImage: health.icon)
+            .foregroundStyle(health.color)
+            .font(.caption)
+        }
+      }
+    }
+  }
+
+  private var accountScopeSection: some View {
+    Section("账号参与范围") {
+      ForEach(model.accounts) { account in
+        Toggle(
+          account.label,
+          isOn: Binding(
+            get: { account.isEnabled },
+            set: { value in Task { await model.setEnabled(account, enabled: value) } }
+          )
+        )
+      }
+      Text("停用后不参与全部刷新、推荐账号和桌面小组件，但仍保留在账号列表，可单独刷新或重新启用。")
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private func loadSettings() async {
+    let savedMinutes = await SharedStore.shared.autoRefreshMinutes()
+    autoMinutes = savedMinutes
+    if [10, 15, 30, 60, 120].contains(savedMinutes) {
+      refreshIntervalPreset = savedMinutes
+    } else {
+      refreshIntervalPreset = -1
+      customRefreshMinutes = savedMinutes
+    }
+    backgroundRefreshEnabled = await SharedStore.shared.backgroundRefreshEnabled()
+    selectedAppIcon = AppIconChoice.resolve(
+      alternateIconName: UIApplication.shared.alternateIconName
+    )
+  }
+
+  private func saveAutoRefreshMinutes(_ newValue: Int) {
+    Task {
+      await SharedStore.shared.setAutoRefreshMinutes(newValue)
+      WidgetCenter.shared.reloadAllTimelines()
+      if backgroundRefreshEnabled { BackgroundRefreshManager.scheduleIfEnabled() }
+    }
+  }
+
+  private func saveBackgroundRefresh(_ enabled: Bool) {
+    Task {
+      await SharedStore.shared.setBackgroundRefreshEnabled(enabled)
+      BackgroundRefreshManager.setEnabled(enabled)
+    }
+  }
+
+  private func saveTheme(_ newTheme: DashboardTheme) {
+    Task {
+      await SharedStore.shared.setDashboardTheme(newTheme)
+      WidgetCenter.shared.reloadAllTimelines()
+    }
   }
 
   private func selectAppIcon(_ choice: AppIconChoice) {
