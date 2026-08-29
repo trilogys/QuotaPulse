@@ -1,12 +1,12 @@
-package com.trilogys.aiquota.core
+package com.trilogys.quotapulse.core
 
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
 
-/** Android codec for the shared ai-quota-native v1 JSON backup format. */
+/** Android codec for the shared quotapulse v1 JSON backup format. */
 object PortableConfigCodec {
-    const val FORMAT = "ai-quota-native"
+    const val FORMAT = "quotapulse"
     const val VERSION = 1
 
     data class ImportedAccount(val record: AccountRecord, val providerAccountId: String?, val credential: Credential?)

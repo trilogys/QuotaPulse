@@ -12,7 +12,7 @@ if ! command -v security >/dev/null 2>&1; then
   echo "This inspector requires macOS 'security'." >&2
   exit 1
 fi
-TMP="$(mktemp -t aiquota-profile).plist"
+TMP="$(mktemp -t quotapulse-profile).plist"
 trap 'rm -f "$TMP"' EXIT
 security cms -D -i "$PROFILE" > "$TMP"
 

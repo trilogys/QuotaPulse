@@ -1,4 +1,4 @@
-package com.trilogys.aiquota
+package com.trilogys.quotapulse
 
 import android.content.Context
 import android.net.Uri
@@ -38,9 +38,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.trilogys.aiquota.core.PortableConfigManager
-import com.trilogys.aiquota.core.PortableImportMode
-import com.trilogys.aiquota.ui.LocalDashboardPalette
+import com.trilogys.quotapulse.core.PortableConfigManager
+import com.trilogys.quotapulse.core.PortableImportMode
+import com.trilogys.quotapulse.ui.LocalDashboardPalette
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch

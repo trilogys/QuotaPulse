@@ -29,22 +29,22 @@ get_cfg() {
   grep -E "^${key} *=" SigningConfig.xcconfig | tail -1 | cut -d= -f2- | xargs
 }
 
-STYLE="$(get_cfg AIQUOTA_CODE_SIGN_STYLE)"
-APP_BUNDLE="$(get_cfg AIQUOTA_APP_BUNDLE_ID)"
-WIDGET_BUNDLE="$(get_cfg AIQUOTA_WIDGET_BUNDLE_ID)"
-APP_PROFILE="$(get_cfg AIQUOTA_APP_PROFILE_SPECIFIER)"
-WIDGET_PROFILE="$(get_cfg AIQUOTA_WIDGET_PROFILE_SPECIFIER)"
+STYLE="$(get_cfg QUOTAPULSE_CODE_SIGN_STYLE)"
+APP_BUNDLE="$(get_cfg QUOTAPULSE_APP_BUNDLE_ID)"
+WIDGET_BUNDLE="$(get_cfg QUOTAPULSE_WIDGET_BUNDLE_ID)"
+APP_PROFILE="$(get_cfg QUOTAPULSE_APP_PROFILE_SPECIFIER)"
+WIDGET_PROFILE="$(get_cfg QUOTAPULSE_WIDGET_PROFILE_SPECIFIER)"
 
 xcodegen generate
-rm -rf build/AIQuota.xcarchive build/export
+rm -rf build/QuotaPulse.xcarchive build/export
 mkdir -p build/export
 
 ARCHIVE_ARGS=(
-  -project AIQuota.xcodeproj
-  -scheme AIQuotaApp
+  -project QuotaPulse.xcodeproj
+  -scheme QuotaPulseApp
   -configuration Release
   -destination 'generic/platform=iOS'
-  -archivePath build/AIQuota.xcarchive
+  -archivePath build/QuotaPulse.xcarchive
 )
 if [[ "$STYLE" == "Automatic" ]]; then
   ARCHIVE_ARGS+=(-allowProvisioningUpdates)
@@ -81,7 +81,7 @@ PLIST
 
 EXPORT_ARGS=(
   -exportArchive
-  -archivePath build/AIQuota.xcarchive
+  -archivePath build/QuotaPulse.xcarchive
   -exportPath build/export
   -exportOptionsPlist build/ExportOptions.plist
 )

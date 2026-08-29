@@ -5,10 +5,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val releaseStoreFile = providers.environmentVariable("AIQUOTA_RELEASE_STORE_FILE").orNull
-val releaseStorePassword = providers.environmentVariable("AIQUOTA_RELEASE_STORE_PASSWORD").orNull
-val releaseKeyAlias = providers.environmentVariable("AIQUOTA_RELEASE_KEY_ALIAS").orNull
-val releaseKeyPassword = providers.environmentVariable("AIQUOTA_RELEASE_KEY_PASSWORD").orNull
+val releaseStoreFile = providers.environmentVariable("QUOTAPULSE_RELEASE_STORE_FILE").orNull
+val releaseStorePassword = providers.environmentVariable("QUOTAPULSE_RELEASE_STORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("QUOTAPULSE_RELEASE_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("QUOTAPULSE_RELEASE_KEY_PASSWORD").orNull
 val hasReleaseSigning = listOf(
     releaseStoreFile,
     releaseStorePassword,
@@ -17,11 +17,11 @@ val hasReleaseSigning = listOf(
 ).all { !it.isNullOrBlank() }
 
 android {
-    namespace = "com.trilogys.aiquota"
+    namespace = "com.trilogys.quotapulse"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.trilogys.aiquota"
+        applicationId = "com.trilogys.quotapulse"
         minSdk = 26
         targetSdk = 37
         versionCode = 1100

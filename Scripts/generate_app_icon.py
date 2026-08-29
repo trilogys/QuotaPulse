@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw, ImageFilter
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / "AIQuotaApp" / "Assets.xcassets"
+ASSETS = ROOT / "QuotaPulseApp" / "Assets.xcassets"
 CANVAS = 2048
 
 OUTPUTS = {

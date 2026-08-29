@@ -4,16 +4,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-APP_BUNDLE="${AIQUOTA_APP_BUNDLE_ID:-com.example.aiquota}"
-OUT_DIR="${AIQUOTA_APP_ONLY_OUTPUT_DIR:-build/app-only-export}"
-DERIVED="${AIQUOTA_APP_ONLY_DERIVED_DIR:-build/app-only-derived}"
+APP_BUNDLE="${QUOTAPULSE_APP_BUNDLE_ID:-com.example.quotapulse}"
+OUT_DIR="${QUOTAPULSE_APP_ONLY_OUTPUT_DIR:-build/app-only-export}"
+DERIVED="${QUOTAPULSE_APP_ONLY_DERIVED_DIR:-build/app-only-derived}"
 
 usage() {
   cat <<'USAGE'
 Usage: bash Scripts/build_app_only_ipa.sh [options]
 
 Options:
-  --bundle ID   Main app bundle ID (default com.example.aiquota)
+  --bundle ID   Main app bundle ID (default com.example.quotapulse)
   --output DIR  Output directory (default build/app-only-export)
 
 Builds an unsigned iPhone device IPA without the Widget extension, App Group,
@@ -43,8 +43,8 @@ rm -rf "$DERIVED" "$OUT_DIR"
 mkdir -p "$DERIVED" "$OUT_DIR"
 
 xcodebuild \
-  -project AIQuota.xcodeproj \
-  -scheme AIQuotaApp \
+  -project QuotaPulse.xcodeproj \
+  -scheme QuotaPulseApp \
   -configuration Release \
   -sdk iphoneos \
   -destination 'generic/platform=iOS' \
@@ -53,23 +53,23 @@ xcodebuild \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY='' \
   DEVELOPMENT_TEAM='' \
-  AIQUOTA_APP_BUNDLE_ID="$APP_BUNDLE" \
+  QUOTAPULSE_APP_BUNDLE_ID="$APP_BUNDLE" \
   build
 
-APP="$(find "$DERIVED/Build/Products/Release-iphoneos" -maxdepth 1 -name 'AIQuotaApp.app' -print -quit)"
-[[ -d "$APP" ]] || { echo "Built AIQuotaApp.app not found." >&2; exit 1; }
+APP="$(find "$DERIVED/Build/Products/Release-iphoneos" -maxdepth 1 -name 'QuotaPulseApp.app' -print -quit)"
+[[ -d "$APP" ]] || { echo "Built QuotaPulseApp.app not found." >&2; exit 1; }
 EMBEDDED_EXTENSION="$(find "$APP/PlugIns" -maxdepth 1 -name '*.appex' -print -quit 2>/dev/null || true)"
 [[ -z "$EMBEDDED_EXTENSION" ]] || { echo "App-only build unexpectedly contains an extension." >&2; exit 1; }
 
 find "$APP" -name _CodeSignature -type d -prune -exec rm -rf {} + 2>/dev/null || true
 find "$APP" -name embedded.mobileprovision -type f -delete 2>/dev/null || true
 
-STAGE="$(mktemp -d -t aiquota-app-only)"
+STAGE="$(mktemp -d -t quotapulse-app-only)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/Payload"
-ditto "$APP" "$STAGE/Payload/AIQuota.app"
+ditto "$APP" "$STAGE/Payload/QuotaPulse.app"
 
-IPA="$ROOT/$OUT_DIR/AIQuota-app-only-unsigned.ipa"
+IPA="$ROOT/$OUT_DIR/QuotaPulse-app-only-unsigned.ipa"
 RESIGN_IPA="$ROOT/$OUT_DIR/QuotaPulse.ipa"
 (
   cd "$STAGE"
@@ -77,7 +77,7 @@ RESIGN_IPA="$ROOT/$OUT_DIR/QuotaPulse.ipa"
 )
 cp "$IPA" "$RESIGN_IPA"
 
-cat > "$ROOT/$OUT_DIR/AIQuota-app-only-signing-info.txt" <<INFO
+cat > "$ROOT/$OUT_DIR/QuotaPulse-app-only-signing-info.txt" <<INFO
 QuotaPulse app-only unsigned / re-sign IPA
 Minimum iOS: 16.0
 Main bundle ID before re-signing: $APP_BUNDLE
@@ -90,7 +90,7 @@ Recommended for:
 - ESign / all-purpose iOS signing tools
 - Aisi Assistant and similar desktop installation tools
 
-The signer may replace the bundle ID. It must sign Payload/AIQuota.app with a
+The signer may replace the bundle ID. It must sign Payload/QuotaPulse.app with a
 matching provisioning profile. A P12 certificate without a provisioning profile
 cannot produce an installable IPA.
 INFO
@@ -99,7 +99,7 @@ INFO
 "$ROOT/Scripts/verify_ipa_structure.sh" "$RESIGN_IPA" unsigned-app-only
 (
   cd "$ROOT/$OUT_DIR"
-  shasum -a 256 AIQuota-app-only-unsigned.ipa > AIQuota-app-only-unsigned.ipa.sha256
+  shasum -a 256 QuotaPulse-app-only-unsigned.ipa > QuotaPulse-app-only-unsigned.ipa.sha256
   shasum -a 256 QuotaPulse.ipa > QuotaPulse.ipa.sha256
 )
 printf '\nApp-only unsigned IPA: %s\nApp-only re-sign IPA: %s\n' "$IPA" "$RESIGN_IPA"

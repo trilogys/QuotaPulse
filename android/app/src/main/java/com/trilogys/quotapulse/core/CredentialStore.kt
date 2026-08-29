@@ -1,4 +1,4 @@
-package com.trilogys.aiquota.core
+package com.trilogys.quotapulse.core
 
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
@@ -12,7 +12,7 @@ class CredentialStore(context: Context) {
 
     private val prefs = EncryptedSharedPreferences.create(
         context,
-        "aiquota_credentials",
+        "quotapulse_credentials",
         masterKey,
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM

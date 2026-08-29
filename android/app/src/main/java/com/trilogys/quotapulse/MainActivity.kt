@@ -1,4 +1,4 @@
-package com.trilogys.aiquota
+package com.trilogys.quotapulse
 
 import android.Manifest
 import android.content.Context
@@ -89,24 +89,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.appwidget.updateAll
-import com.trilogys.aiquota.auth.OAuthManager
-import com.trilogys.aiquota.core.AccountRecord
-import com.trilogys.aiquota.core.AccountStore
-import com.trilogys.aiquota.core.BalanceSnapshot
-import com.trilogys.aiquota.core.Credential
-import com.trilogys.aiquota.core.CredentialAuthenticationMode
-import com.trilogys.aiquota.core.CredentialStore
-import com.trilogys.aiquota.core.ProviderErrorClassifier
-import com.trilogys.aiquota.core.ProviderErrorKind
-import com.trilogys.aiquota.core.ProviderId
-import com.trilogys.aiquota.core.UsageService
-import com.trilogys.aiquota.core.UsageSnapshot
-import com.trilogys.aiquota.core.UsageWindow
-import com.trilogys.aiquota.ui.DashboardThemeOption
-import com.trilogys.aiquota.ui.DashboardThemePreferences
-import com.trilogys.aiquota.ui.LocalDashboardPalette
-import com.trilogys.aiquota.ui.QuotaPulseTheme
-import com.trilogys.aiquota.widget.AIQuotaWidget
+import com.trilogys.quotapulse.auth.OAuthManager
+import com.trilogys.quotapulse.core.AccountRecord
+import com.trilogys.quotapulse.core.AccountStore
+import com.trilogys.quotapulse.core.BalanceSnapshot
+import com.trilogys.quotapulse.core.Credential
+import com.trilogys.quotapulse.core.CredentialAuthenticationMode
+import com.trilogys.quotapulse.core.CredentialStore
+import com.trilogys.quotapulse.core.ProviderErrorClassifier
+import com.trilogys.quotapulse.core.ProviderErrorKind
+import com.trilogys.quotapulse.core.ProviderId
+import com.trilogys.quotapulse.core.UsageService
+import com.trilogys.quotapulse.core.UsageSnapshot
+import com.trilogys.quotapulse.core.UsageWindow
+import com.trilogys.quotapulse.ui.DashboardThemeOption
+import com.trilogys.quotapulse.ui.DashboardThemePreferences
+import com.trilogys.quotapulse.ui.LocalDashboardPalette
+import com.trilogys.quotapulse.ui.QuotaPulseTheme
+import com.trilogys.quotapulse.widget.QuotaPulseWidget
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
@@ -128,7 +128,7 @@ class MainActivity : ComponentActivity() {
             var theme by remember { mutableStateOf(DashboardThemePreferences.load(context)) }
             QuotaPulseTheme(theme) {
                 val credentialStore = remember { CredentialStore(this) }
-                AIQuotaScreen(
+                QuotaPulseScreen(
                     store = remember { AccountStore(this) },
                     credentials = credentialStore,
                     service = remember { UsageService(credentialStore) },
@@ -138,7 +138,7 @@ class MainActivity : ComponentActivity() {
                         theme = it
                         DashboardThemePreferences.save(context, it)
                     },
-                    updateWidget = { AIQuotaWidget().updateAll(this) }
+                    updateWidget = { QuotaPulseWidget().updateAll(this) }
                 )
             }
         }
@@ -154,7 +154,7 @@ private data class AccountEditorSeed(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AIQuotaScreen(
+private fun QuotaPulseScreen(
     store: AccountStore,
     credentials: CredentialStore,
     service: UsageService,

@@ -1,4 +1,4 @@
-# AI Quota Native v0.8.0
+# QuotaPulse v0.8.0
 
 ## IPA-first release
 

@@ -64,7 +64,7 @@ actor QuotaNotifier {
       content.sound = .default
 
       let request = UNNotificationRequest(
-        identifier: "aiquota.\(account.id.uuidString).\(window.id).\(level)",
+        identifier: "quotapulse.\(account.id.uuidString).\(window.id).\(level)",
         content: content,
         trigger: nil
       )

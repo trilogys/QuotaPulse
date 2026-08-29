@@ -4,7 +4,7 @@ import Foundation
 /// JSON field names are intentionally stable and must remain compatible across platforms.
 struct PortableConfig: Codable, Sendable {
   static let currentVersion = 1
-  var format: String = "ai-quota-native"
+  var format: String = "quotapulse"
   var version: Int = currentVersion
   var exportedAt: Date = .now
   var accounts: [PortableAccount]
@@ -63,7 +63,7 @@ struct PortableConfigCodec {
   static func decode(_ data:Data) throws -> PortableConfig {
     let decoder=JSONDecoder();decoder.dateDecodingStrategy = .iso8601
     let config=try decoder.decode(PortableConfig.self,from:data)
-    guard config.format == "ai-quota-native" else { throw PortableConfigError.invalidFormat }
+    guard config.format == "quotapulse" else { throw PortableConfigError.invalidFormat }
     guard config.version <= PortableConfig.currentVersion else { throw PortableConfigError.unsupportedVersion(config.version) }
     return config
   }
@@ -72,7 +72,7 @@ struct PortableConfigCodec {
     guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
       throw PortableConfigError.invalidFormat
     }
-    if root["format"] as? String == "ai-quota-native" {
+    if root["format"] as? String == "quotapulse" {
       return PortableDecodedImport(
         config: try decode(data),
         source: .quotaPulse,

@@ -1,4 +1,4 @@
-package com.trilogys.aiquota.core
+package com.trilogys.quotapulse.core
 
 import java.util.UUID
 

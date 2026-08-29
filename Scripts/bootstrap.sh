@@ -9,4 +9,4 @@ if ! command -v xcodegen >/dev/null 2>&1; then
   brew install xcodegen
 fi
 xcodegen generate
-printf '\nGenerated AIQuota.xcodeproj. Open it in Xcode and select your Development Team.\n'
+printf '\nGenerated QuotaPulse.xcodeproj. Open it in Xcode and select your Development Team.\n'

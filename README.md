@@ -70,18 +70,18 @@ Complete backups contain sensitive API keys and OAuth tokens. Store them only in
 The `ipa` GitHub Actions workflow produces unsigned, re-signable, and certificate-signed outputs.
 
 ```text
-AIQuota-iOS-resign
-├─ AIQuota-resign.ipa
-├─ AIQuota-unsigned.ipa
+QuotaPulse-iOS-resign
+├─ QuotaPulse-resign.ipa
+├─ QuotaPulse-unsigned.ipa
 ├─ QuotaPulse.ipa
-├─ AIQuota-app-only-unsigned.ipa
+├─ QuotaPulse-app-only-unsigned.ipa
 ├─ SHA256
 └─ signing-info
 ```
 
 `QuotaPulse.ipa` is the app-only compatibility package. It excludes the Widget extension and is intended for tools such as ESign or Aisi Assistant when only one provisioning profile is available.
 
-`AIQuota-resign.ipa` includes the Widget extension. Re-signing it requires matching App, Widget, App Group, and Keychain entitlements.
+`QuotaPulse-resign.ipa` includes the Widget extension. Re-signing it requires matching App, Widget, App Group, and Keychain entitlements.
 
 A P12 file contains a certificate and private key but is not a provisioning profile. An installable signed IPA still requires a compatible provisioning profile.
 
@@ -117,8 +117,8 @@ The iOS app can check the latest GitHub Release and open its release page. iOS d
 ## Repository Layout
 
 ```text
-AIQuotaApp/        iOS app, settings, OAuth, and account UI
-AIQuotaWidget/     iOS WidgetKit extension
+QuotaPulseApp/        iOS app, settings, OAuth, and account UI
+QuotaPulseWidget/     iOS WidgetKit extension
 Shared/            iOS provider, storage, charts, and networking code
 android/           Android app, workers, widgets, and resources
 .github/workflows/ build workflows

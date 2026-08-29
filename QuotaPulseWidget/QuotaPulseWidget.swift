@@ -2,7 +2,7 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-struct AIQuotaEntry: TimelineEntry {
+struct QuotaPulseEntry: TimelineEntry {
   let date: Date
   let items: [WidgetDisplayItem]
   let selectedAccountIDs: [UUID]
@@ -13,7 +13,7 @@ struct AIQuotaEntry: TimelineEntry {
 }
 
 private enum WidgetEntryLoader {
-  static func placeholder() -> AIQuotaEntry {
+  static func placeholder() -> QuotaPulseEntry {
     let account = AccountRecord(provider: .codex, label: "Codex · Work")
     let snapshot = UsageSnapshot(
       accountID: account.id,
@@ -23,7 +23,7 @@ private enum WidgetEntryLoader {
         UsageWindow(id: "week", label: "周", remainingPercent: 48, resetAt: .now.addingTimeInterval(172_800)),
       ]
     )
-    return AIQuotaEntry(
+    return QuotaPulseEntry(
       date: .now,
       items: [WidgetDisplayItem(account: account, snapshot: snapshot)],
       selectedAccountIDs: [account.id],
@@ -39,7 +39,7 @@ private enum WidgetEntryLoader {
     return Array(accounts.prefix(itemLimit(for: family)))
   }
 
-  static func entry(accounts: [AccountRecord]) async -> AIQuotaEntry {
+  static func entry(accounts: [AccountRecord]) async -> QuotaPulseEntry {
     var items: [WidgetDisplayItem] = []
     var cooldowns: [UUID: Date] = [:]
     for account in accounts {
@@ -56,7 +56,7 @@ private enum WidgetEntryLoader {
       issue = reason
     }
     let theme = await SharedStore.shared.dashboardTheme()
-    return AIQuotaEntry(
+    return QuotaPulseEntry(
       date: .now,
       items: items,
       selectedAccountIDs: accounts.map(\.id),
@@ -82,19 +82,19 @@ private enum WidgetEntryLoader {
   }
 }
 
-struct AIQuotaLegacyProvider: TimelineProvider {
-  func placeholder(in context: Context) -> AIQuotaEntry {
+struct QuotaPulseLegacyProvider: TimelineProvider {
+  func placeholder(in context: Context) -> QuotaPulseEntry {
     WidgetEntryLoader.placeholder()
   }
 
-  func getSnapshot(in context: Context, completion: @escaping (AIQuotaEntry) -> Void) {
+  func getSnapshot(in context: Context, completion: @escaping (QuotaPulseEntry) -> Void) {
     Task {
       let accounts = await WidgetEntryLoader.enabledAccounts(family: context.family)
       completion(await WidgetEntryLoader.entry(accounts: accounts))
     }
   }
 
-  func getTimeline(in context: Context, completion: @escaping (Timeline<AIQuotaEntry>) -> Void) {
+  func getTimeline(in context: Context, completion: @escaping (Timeline<QuotaPulseEntry>) -> Void) {
     Task {
       let accounts = await WidgetEntryLoader.enabledAccounts(family: context.family)
       if WidgetEntryLoader.canRefreshCredentials() {
@@ -108,16 +108,16 @@ struct AIQuotaLegacyProvider: TimelineProvider {
 }
 
 @available(iOS 17.0, *)
-struct AIQuotaProvider: AppIntentTimelineProvider {
-  func placeholder(in context: Context) -> AIQuotaEntry {
+struct QuotaPulseProvider: AppIntentTimelineProvider {
+  func placeholder(in context: Context) -> QuotaPulseEntry {
     WidgetEntryLoader.placeholder()
   }
 
-  func snapshot(for configuration: AIQuotaWidgetConfigurationIntent, in context: Context) async -> AIQuotaEntry {
+  func snapshot(for configuration: QuotaPulseWidgetConfigurationIntent, in context: Context) async -> QuotaPulseEntry {
     await WidgetEntryLoader.entry(accounts: configuredAccounts(configuration, family: context.family))
   }
 
-  func timeline(for configuration: AIQuotaWidgetConfigurationIntent, in context: Context) async -> Timeline<AIQuotaEntry> {
+  func timeline(for configuration: QuotaPulseWidgetConfigurationIntent, in context: Context) async -> Timeline<QuotaPulseEntry> {
     let accounts = await configuredAccounts(configuration, family: context.family)
     if WidgetEntryLoader.canRefreshCredentials() {
       _ = await CooldownAwareRefresh.shared.refresh(accountIDs: accounts.map(\.id), manual: false)
@@ -128,7 +128,7 @@ struct AIQuotaProvider: AppIntentTimelineProvider {
   }
 
   private func configuredAccounts(
-    _ configuration: AIQuotaWidgetConfigurationIntent,
+    _ configuration: QuotaPulseWidgetConfigurationIntent,
     family: WidgetFamily
   ) async -> [AccountRecord] {
     let enabled = await SharedStore.shared.accounts().filter(\.isEnabled)
@@ -150,20 +150,20 @@ struct AIQuotaProvider: AppIntentTimelineProvider {
   }
 }
 
-struct AIQuotaWidgetView: View {
+struct QuotaPulseWidgetView: View {
   @Environment(\.widgetFamily) private var family
-  let entry: AIQuotaEntry
+  let entry: QuotaPulseEntry
 
   var body: some View {
     if #available(iOS 17.0, *) {
       content
         .containerBackground(for: .widget) { background }
-        .widgetURL(URL(string: "aiquota://accounts"))
+        .widgetURL(URL(string: "quotapulse://accounts"))
         .environment(\.colorScheme, entry.theme.preferredColorScheme)
     } else {
       content
         .background(background)
-        .widgetURL(URL(string: "aiquota://accounts"))
+        .widgetURL(URL(string: "quotapulse://accounts"))
         .environment(\.colorScheme, entry.theme.preferredColorScheme)
     }
   }
@@ -432,12 +432,12 @@ struct AIQuotaWidgetView: View {
   }
 }
 
-struct AIQuotaWidget: Widget {
+struct QuotaPulseWidget: Widget {
   let kind = AppConfig.widgetKind
 
   var body: some WidgetConfiguration {
-    StaticConfiguration(kind: kind, provider: AIQuotaLegacyProvider()) { entry in
-      AIQuotaWidgetView(entry: entry)
+    StaticConfiguration(kind: kind, provider: QuotaPulseLegacyProvider()) { entry in
+      QuotaPulseWidgetView(entry: entry)
     }
     .configurationDisplayName("QuotaPulse")
     .description("查看 Codex、Claude、Kimi 等服务的额度。点按可打开 App 刷新。")
@@ -446,16 +446,16 @@ struct AIQuotaWidget: Widget {
 }
 
 @available(iOS 17.0, *)
-struct AIQuotaInteractiveWidget: Widget {
+struct QuotaPulseInteractiveWidget: Widget {
   let kind = AppConfig.widgetKind
 
   var body: some WidgetConfiguration {
     AppIntentConfiguration(
       kind: kind,
-      intent: AIQuotaWidgetConfigurationIntent.self,
-      provider: AIQuotaProvider()
+      intent: QuotaPulseWidgetConfigurationIntent.self,
+      provider: QuotaPulseProvider()
     ) { entry in
-      AIQuotaWidgetView(entry: entry)
+      QuotaPulseWidgetView(entry: entry)
     }
     .configurationDisplayName("QuotaPulse")
     .description("查看 AI 服务额度，支持选择服务或账号并原地刷新。")

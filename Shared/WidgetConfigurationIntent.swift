@@ -79,7 +79,7 @@ private extension WidgetAccountEntity {
 }
 
 @available(iOS 17.0, *)
-struct AIQuotaWidgetConfigurationIntent: WidgetConfigurationIntent {
+struct QuotaPulseWidgetConfigurationIntent: WidgetConfigurationIntent {
   static let title: LocalizedStringResource = "配置 QuotaPulse 小组件"
   static let description = IntentDescription("选择显示全部账号、单个 Provider 或单个账号。")
 
