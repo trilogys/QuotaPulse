@@ -60,6 +60,7 @@ assert all(value in history_view for value in ['case ring', 'case bar', 'case li
 assert 'chart.pie.fill' in history_view and 'chart.donut' not in history_view
 assert 'case tokens' in history and 'Codex OAuth 提供累计与每日 Token' in history_view
 assert all(value in history_view for value in ['CodexOfficialTokenActivityCard', '53 * 7', 'case daily', 'case weekly', 'case cumulative'])
+assert all(value in history_view for value in ['点按日期查看用量', 'selectedCell.dailyTokens', 'selectedHeatmapPoint = point', 'selectedHeatmapValues'])
 assert '.frame(width: 13, height: 13)' in history_view and '.font(.system(size: 10, weight: .semibold))' in history_view
 assert all(value in history_view for value in ['总计 Token', '峰值 Token', '当前连续天数', '最长连续天数'])
 assert 'aggregateHistory' in store and 'clearHistory' in store
@@ -70,6 +71,7 @@ assert '/wham/profiles/me' in usage and 'daily_usage_buckets' in usage
 assert all(value in usage for value in ['/wham/tasks?limit=50', '/wham/usage/thread_usage/query', 'queryCodexModelUsage'])
 assert all(value in usage for value in ['fetchOpenAIAPIKey', 'fetchClaudeAPIKey', 'fetchKimiAPIKey', 'organization/usage/completions'])
 assert 'users/me/balance' in usage
+assert 'fetchDeepSeek' in usage and r'\(base)/models' in usage
 models_text=Path('Shared/Models.swift').read_text(encoding='utf-8')
 assert 'codexTokenUsage' in models_text and 'CodexModelTokenUsage' in models_text
 assert 'CredentialAuthenticationMode' in models_text and 'case apiKey' in models_text
@@ -83,6 +85,7 @@ import xml.etree.ElementTree as ET
 assert 'CredentialAuthenticationMode' in android_models and 'connectionLabel' in android_models
 assert all(value in android_usage for value in ['fetchOpenAIKey', 'fetchClaudeKey', 'fetchKimiKey'])
 assert 'availableModels=models' in android_usage and 'availableModels' in android_models
+assert 'modelIds(body)' in android_usage and 'request("models")' in android_usage
 assert 'CredentialAuthenticationMode.API_KEY' in android_ui and 'snapshot?.connectionLabel' in android_ui
 assert 'R.string.available_models' in android_ui
 assert 'QuotaPulse-backup-' in android_portable_ui and 'yyyyMMdd-HHmmss' in android_portable_ui

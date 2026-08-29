@@ -11,7 +11,7 @@ AI 服务额度监控：**原生 iOS + 原生 Android + 桌面小组件 + 多账
 - Codex / OpenAI：ChatGPT OAuth 或 API Key，多账号，动态额度窗口、累计与每日 Token
 - Claude：OAuth 或 API Key，多账号，OAuth 账号显示 5h / 周额度
 - Kimi：Device OAuth 或 API Key，多账号；Key 账号显示余额和可用模型，OAuth 账号显示动态额度窗口
-- DeepSeek：API Key，多账号，余额
+- DeepSeek：API Key，多账号，官方余额和可用模型
 
 iOS 端还保留 MiniMax、GLM / Z.ai、GitHub Copilot 等适配，后续逐步同步 Android。
 

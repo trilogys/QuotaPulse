@@ -713,7 +713,46 @@ actor UsageService {
   }
 
   private func fetchDeepSeek(account: AccountRecord, credential: Credential) async throws -> UsageSnapshot {
-    let result = try await http.send(URL(string: "https://api.deepseek.com/user/balance")!, headers: ["Authorization": "Bearer \(credential.accessToken)", "Accept": "application/json"]); guard (200..<300).contains(result.statusCode) else { throw UsageError.http(result.statusCode, String(data: result.data, encoding: .utf8) ?? "") }; let root = try result.jsonDictionary(); guard let infos = root["balance_infos"] as? [[String: Any]], !infos.isEmpty else { throw UsageError.invalidResponse("No balance_infos") }; let preferred = infos.first(where: { string($0["currency"]) == "CNY" }) ?? infos.first(where: { string($0["currency"]) == "USD" }) ?? infos[0]; let currency = string(preferred["currency"]) ?? ""; let symbol = currency == "CNY" ? "¥" : (currency == "USD" ? "$" : "\(currency) "); let balance = BalanceSnapshot(currency: currency, symbol: symbol, total: number(preferred["total_balance"]) ?? 0, granted: number(preferred["granted_balance"]) ?? 0, toppedUp: number(preferred["topped_up_balance"]) ?? 0, available: bool(root["is_available"]) ?? true); return UsageSnapshot(accountID: account.id, provider: .deepseek, balance: balance)
+    let base = normalizedBaseURL(credential.baseURL, fallback: "https://api.deepseek.com")
+    let headers = ["Authorization": "Bearer \(credential.accessToken)", "Accept": "application/json"]
+    let result = try await http.send(URL(string: "\(base)/user/balance")!, headers: headers)
+    guard (200..<300).contains(result.statusCode) else {
+      throw UsageError.http(result.statusCode, String(data: result.data, encoding: .utf8) ?? "")
+    }
+    let root = try result.jsonDictionary()
+    guard let infos = root["balance_infos"] as? [[String: Any]], !infos.isEmpty else {
+      throw UsageError.invalidResponse("No balance_infos")
+    }
+    let preferred = infos.first(where: { string($0["currency"]) == "CNY" })
+      ?? infos.first(where: { string($0["currency"]) == "USD" })
+      ?? infos[0]
+    let currency = string(preferred["currency"]) ?? ""
+    let symbol = currency == "CNY" ? "¥" : (currency == "USD" ? "$" : "\(currency) ")
+    let balance = BalanceSnapshot(
+      currency: currency,
+      symbol: symbol,
+      total: number(preferred["total_balance"]) ?? 0,
+      granted: number(preferred["granted_balance"]) ?? 0,
+      toppedUp: number(preferred["topped_up_balance"]) ?? 0,
+      available: bool(root["is_available"]) ?? true
+    )
+    let modelResult = try? await http.send(URL(string: "\(base)/models")!, headers: headers)
+    let models: [String]
+    if let modelResult,
+      (200..<300).contains(modelResult.statusCode),
+      let modelRoot = try? modelResult.jsonDictionary() {
+      models = availableModelIDs(modelRoot)
+    } else {
+      models = []
+    }
+    return UsageSnapshot(
+      accountID: account.id,
+      provider: .deepseek,
+      metrics: [UsageMetric(label: "可用模型", value: "\(models.count)")],
+      availableModels: models,
+      balance: balance,
+      authenticationMode: .apiKey
+    )
   }
 
   private func fetchMiniMax(account: AccountRecord, credential: Credential) async throws -> UsageSnapshot {

@@ -13,7 +13,7 @@ The app does not use a QuotaPulse-operated backend. Requests go directly to the 
 | Codex / OpenAI | ChatGPT OAuth or API Key | Quota windows, resets, official token activity, model details when returned, Platform model access |
 | Claude | OAuth or API Key | OAuth quota windows or API model access |
 | Kimi | Device OAuth or API Key | Coding-plan quota windows, API balance, and available models |
-| DeepSeek | API Key | Official account balance |
+| DeepSeek | API Key | Official account balance and available models |
 | MiniMax | Key | Coding-plan quota |
 | GLM / Z.ai | Key | Coding-plan quota |
 | GitHub Copilot | Token | Quota snapshots |
@@ -35,6 +35,7 @@ Highlights:
 - Daily, weekly, and cumulative token aggregation
 - Manual Codex model-detail lookup for available cloud task usage
 - Kimi API balance and available-model listing
+- DeepSeek API balance and available-model listing
 - Named HTTP(S) and SOCKS5 proxy links with per-service scope, activation, and latency tests
 - Foreground refresh intervals and an optional iOS background refresh request
 - Custom background interval from 10 to 1,440 minutes

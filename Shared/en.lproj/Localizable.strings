@@ -220,5 +220,9 @@
 "每周" = "Weekly";
 "累计" = "Cumulative";
 "当日" = "Day";
+"点按日期查看用量" = "Tap a date for usage";
+"当日：%@" = "Day: %@";
+"%lld 项明细" = "%lld entries";
+"DeepSeek 显示官方 API 余额和可用模型，不伪装成 5h/周额度。" = "DeepSeek shows the official API balance and available models rather than presenting them as 5-hour or weekly quota windows.";
 "当周" = "Week";
 "%lld 天" = "%lld days";

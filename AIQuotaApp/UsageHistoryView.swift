@@ -282,20 +282,34 @@ private struct CodexOfficialTokenActivityCard: View {
       }
       .frame(height: 140)
 
-      HStack(spacing: 5) {
-        Text("低")
-        ForEach(1...5, id: \.self) { level in
-          RoundedRectangle(cornerRadius: 2)
-            .fill(color(level: level))
-            .frame(width: 13, height: 13)
+      VStack(alignment: .leading, spacing: 8) {
+        HStack(spacing: 5) {
+          Text("低")
+          ForEach(1...5, id: \.self) { level in
+            RoundedRectangle(cornerRadius: 2)
+              .fill(color(level: level))
+              .frame(width: 13, height: 13)
+          }
+          Text("高")
+          Spacer()
+          Text("点按日期查看用量")
         }
-        Text("高")
-        Spacer()
         if let selectedCell {
-          Text(selectedCell.date.formatted(date: .abbreviated, time: .omitted))
-          Text("\(selectedLabel)：\(exactTokens(selectedCell.value))")
-            .fontWeight(.semibold)
-            .foregroundStyle(theme.accent(for: .codex))
+          HStack(spacing: 8) {
+            Label(
+              selectedCell.date.formatted(date: .abbreviated, time: .omitted),
+              systemImage: "calendar"
+            )
+            Spacer()
+            Text("当日：\(exactTokens(selectedCell.dailyTokens))")
+              .fontWeight(.semibold)
+              .foregroundStyle(theme.accent(for: .codex))
+            if aggregation != .daily {
+              Text("\(selectedLabel)：\(exactTokens(selectedCell.value))")
+                .fontWeight(.semibold)
+                .foregroundStyle(theme.secondaryText)
+            }
+          }
         }
       }
       .font(.system(size: 10, weight: .medium))
@@ -326,9 +340,7 @@ private struct CodexOfficialTokenActivityCard: View {
     }
     .buttonStyle(.plain)
     .disabled(day.isFuture)
-    .accessibilityLabel(
-      "\(day.date.formatted(date: .complete, time: .omitted))，\(selectedLabel) \(exactTokens(day.value))"
-    )
+    .accessibilityLabel(Text(verbatim: heatmapAccessibilityLabel(day)))
   }
 
   private func intensityLevel(_ value: Int64) -> Int {
@@ -363,6 +375,13 @@ private struct CodexOfficialTokenActivityCard: View {
     case .weekly: NSLocalizedString("当周", comment: "")
     case .cumulative: NSLocalizedString("累计", comment: "")
     }
+  }
+
+  private func heatmapAccessibilityLabel(_ day: CodexTokenHeatmapDay) -> String {
+    let date = day.date.formatted(date: .complete, time: .omitted)
+    let daily = "当日 \(exactTokens(day.dailyTokens))"
+    guard aggregation != .daily else { return "\(date)，\(daily)" }
+    return "\(date)，\(daily)，\(selectedLabel) \(exactTokens(day.value))"
   }
 
   private func compactTokens(_ value: Int64?) -> String {
@@ -686,6 +705,13 @@ private struct HistoryChartCard: View {
     }.sorted { $0.date < $1.date }
   }
 
+  private var selectedHeatmapValues: [(series: HistorySeries, point: HistoryPoint)] {
+    guard let selectedHeatmapPoint else { return [] }
+    return allPoints
+      .filter { $0.point.date == selectedHeatmapPoint.date }
+      .sorted { $0.series.name.localizedCaseInsensitiveCompare($1.series.name) == .orderedAscending }
+  }
+
   private var chartDomain: ClosedRange<Double> {
     if series.first?.kind == .utilization { return 0...100 }
     let maximum = allPoints.map { $0.point.value }.max() ?? 1
@@ -914,18 +940,40 @@ private struct HistoryChartCard: View {
       .foregroundStyle(theme.secondaryText)
 
       if let selected = selectedHeatmapPoint {
-        HStack {
-          Text(selected.date.formatted(date: .abbreviated, time: range == .today && selected.unit != "Token" ? .shortened : .omitted))
-          Spacer()
-          Text(selected.provider.title)
-          Text(formatted(selected.value, unit: selected.unit))
-            .fontWeight(.bold)
-            .foregroundStyle(theme.accent(for: selected.provider))
+        VStack(alignment: .leading, spacing: 7) {
+          HStack {
+            Label(
+              selected.date.formatted(
+                date: .abbreviated,
+                time: range == .today && selected.unit != "Token" ? .shortened : .omitted
+              ),
+              systemImage: "calendar"
+            )
+            Spacer()
+            Text("\(selectedHeatmapValues.count) 项明细")
+          }
+          ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+              ForEach(Array(selectedHeatmapValues.enumerated()), id: \.offset) { item in
+                HStack(spacing: 5) {
+                  Circle()
+                    .fill(theme.accent(for: item.element.series.provider))
+                    .frame(width: 6, height: 6)
+                  Text(item.element.series.name)
+                    .foregroundStyle(theme.secondaryText)
+                  Text(formatted(item.element.point.value, unit: item.element.series.unit))
+                    .fontWeight(.bold)
+                    .foregroundStyle(theme.accent(for: item.element.series.provider))
+                }
+                .padding(.horizontal, 8)
+                .frame(height: 26)
+                .background(theme.surfaceRaised, in: RoundedRectangle(cornerRadius: 5))
+              }
+            }
+          }
         }
         .font(.system(size: 11, weight: .medium))
         .foregroundStyle(theme.secondaryText)
-        .lineLimit(1)
-        .minimumScaleFactor(0.72)
       }
     }
     .frame(minHeight: 176, alignment: .top)
