@@ -82,16 +82,25 @@ struct ProxySettingsView: View {
   @State private var password = ""
   @State private var results: [ProxyProbeResult] = []
   @State private var isTesting = false
+  @State private var testingSavedProfileID: UUID?
+  @State private var savedResults: [UUID: [ProxyProbeResult]] = [:]
   @State private var statusMessage: String?
   @State private var pendingDelete: AppProxyProfile?
 
   var body: some View {
     Form {
       Section(editingID == nil ? "创建代理" : "编辑代理") {
-        TextField("代理名称", text: $profileName)
+        TextField("代理名称（可选）", text: $profileName)
           .textInputAutocapitalization(.never)
           .autocorrectionDisabled()
         Toggle("保存后激活", isOn: $activateAfterSave)
+        TextField("socks5://user:pass@host:port", text: $proxyLink)
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+          .keyboardType(.URL)
+        Text("兼容 socks5://、socks://、socket://、http:// 和 https://；特殊字符建议使用 URL 编码。")
+          .font(.footnote)
+          .foregroundStyle(.secondary)
       }
 
       Section("适用服务") {
@@ -103,43 +112,6 @@ struct ProxySettingsView: View {
           .foregroundStyle(.secondary)
       }
 
-      Section("代理链接") {
-        TextField("socks5://user:pass@host:port", text: $proxyLink)
-          .textInputAutocapitalization(.never)
-          .autocorrectionDisabled()
-          .keyboardType(.URL)
-        Button {
-          parseProxyLink()
-        } label: {
-          Label("解析代理链接", systemImage: "link")
-        }
-        .disabled(proxyLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        Text("兼容 socks5://、socks://、socket://、http:// 和 https://；特殊字符建议使用 URL 编码。")
-          .font(.footnote)
-          .foregroundStyle(.secondary)
-      }
-
-      Section("代理类型") {
-        Picker("代理类型", selection: $configuration.kind) {
-          Text(AppProxyKind.http.title).tag(AppProxyKind.http)
-          Text(AppProxyKind.socks5.title).tag(AppProxyKind.socks5)
-        }
-        .pickerStyle(.segmented)
-      }
-
-      Section("服务器") {
-        TextField("主机，例如 192.168.1.2", text: $configuration.host)
-          .textInputAutocapitalization(.never)
-          .autocorrectionDisabled()
-          .keyboardType(.URL)
-        TextField("端口", text: portBinding)
-          .keyboardType(.numberPad)
-        TextField("用户名（可选）", text: $configuration.username)
-          .textInputAutocapitalization(.never)
-          .autocorrectionDisabled()
-        SecureField("密码（可选）", text: $password)
-      }
-
       if let validationMessage = draftValidationMessage {
         Section {
           Label(validationMessage, systemImage: "exclamationmark.triangle")
@@ -147,47 +119,32 @@ struct ProxySettingsView: View {
         }
       }
 
-      Section("连接测试") {
-        Button {
-          testProxy()
-        } label: {
-          HStack {
-            Label(isTesting ? "正在测试" : "测试所选服务", systemImage: "speedometer")
-            Spacer()
-            if isTesting { ProgressView() }
-          }
-        }
-        .disabled(isTesting || draftValidationMessage != nil)
-
-        ForEach(results) { result in
-          HStack {
-            Text(result.name)
-            Spacer()
-            if let latency = result.latencyMilliseconds {
-              Text("\(latency) ms")
-                .font(.system(.body, design: .monospaced).weight(.semibold))
-                .foregroundStyle(latencyColor(latency))
-            } else {
-              Text("失败").foregroundStyle(.red)
-            }
-          }
-          if let error = result.errorMessage {
-            Text(error)
-              .font(.caption)
-              .foregroundStyle(.secondary)
-              .lineLimit(3)
-          }
-        }
-      }
-
       Section {
-        Button {
-          saveProfile()
-        } label: {
-          Label(editingID == nil ? "创建代理" : "保存修改", systemImage: "checkmark.circle")
-            .frame(maxWidth: .infinity)
+        HStack(spacing: 10) {
+          Button {
+            testProxy()
+          } label: {
+            Label(isTesting ? "测试中" : "测试服务", systemImage: "speedometer")
+              .lineLimit(1)
+              .minimumScaleFactor(0.75)
+              .frame(maxWidth: .infinity)
+          }
+          .buttonStyle(.bordered)
+          .disabled(isTesting || draftValidationMessage != nil)
+
+          Button {
+            saveProfile()
+          } label: {
+            Label(editingID == nil ? "创建代理" : "保存修改", systemImage: "checkmark.circle")
+              .lineLimit(1)
+              .minimumScaleFactor(0.75)
+              .frame(maxWidth: .infinity)
+          }
+          .buttonStyle(.borderedProminent)
+          .disabled(draftValidationMessage != nil)
         }
-        .disabled(draftValidationMessage != nil)
+
+        probeRows(results)
 
         if editingID != nil {
           Button("取消编辑", role: .cancel) { resetEditor() }
@@ -221,6 +178,7 @@ struct ProxySettingsView: View {
     .navigationTitle("网络代理")
     .navigationBarTitleDisplayMode(.inline)
     .task { await loadProfiles() }
+    .onChange(of: proxyLink) { _ in results = [] }
     .confirmationDialog(
       "删除代理？",
       isPresented: Binding(
@@ -270,6 +228,15 @@ struct ProxySettingsView: View {
         } label: {
           Label("编辑", systemImage: "pencil")
         }
+        Button {
+          testSavedProfile(profile)
+        } label: {
+          Label(
+            testingSavedProfileID == profile.id ? "测试中" : "测试",
+            systemImage: "speedometer"
+          )
+        }
+        .disabled(testingSavedProfileID != nil)
         Spacer()
         Button(role: .destructive) {
           pendingDelete = profile
@@ -280,25 +247,21 @@ struct ProxySettingsView: View {
       }
       .font(.system(size: 12, weight: .semibold))
       .buttonStyle(.plain)
+
+      probeRows(savedResults[profile.id] ?? [])
     }
     .padding(.vertical, 4)
   }
 
   private var draftValidationMessage: String? {
-    AppProxyProfile(
-      id: editingID ?? UUID(),
-      name: profileName,
-      configuration: configuration,
-      targets: targets,
-      isActive: activateAfterSave
-    ).validationMessage
-  }
-
-  private var portBinding: Binding<String> {
-    Binding(
-      get: { configuration.port == 0 ? "" : String(configuration.port) },
-      set: { configuration.port = Int($0.filter(\.isNumber)) ?? 0 }
-    )
+    if targets.isEmpty { return "请至少选择 Codex 或 Claude" }
+    if proxyLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "请输入代理链接" }
+    do {
+      _ = try AppProxyConfiguration.parse(link: proxyLink)
+      return nil
+    } catch {
+      return error.localizedDescription
+    }
   }
 
   private func targetBinding(_ target: AppProxyTarget) -> Binding<Bool> {
@@ -314,24 +277,25 @@ struct ProxySettingsView: View {
     profiles = await SharedStore.shared.proxyProfiles()
   }
 
-  private func parseProxyLink() {
+  private func saveProfile() {
+    let parsed: ParsedAppProxyLink
     do {
-      let parsed = try AppProxyConfiguration.parse(link: proxyLink)
-      configuration = parsed.configuration
-      password = parsed.password
-      results = []
-      statusMessage = "代理链接已解析，请测试后创建"
+      parsed = try AppProxyConfiguration.parse(link: proxyLink)
     } catch {
       statusMessage = error.localizedDescription
+      return
     }
-  }
-
-  private func saveProfile() {
+    configuration = parsed.configuration
+    password = parsed.password
     let existing = editingID.flatMap { id in profiles.first { $0.id == id } }
+    let trimmedName = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
+    let resolvedName = trimmedName.isEmpty
+      ? (existing?.name ?? "代理 \(profiles.count + 1)")
+      : trimmedName
     let profile = AppProxyProfile(
       id: editingID ?? UUID(),
-      name: profileName.trimmingCharacters(in: .whitespacesAndNewlines),
-      configuration: configuration,
+      name: resolvedName,
+      configuration: parsed.configuration,
       targets: targets,
       isActive: activateAfterSave,
       createdAt: existing?.createdAt ?? .now
@@ -357,8 +321,8 @@ struct ProxySettingsView: View {
     configuration = profile.configuration
     targets = profile.targets
     activateAfterSave = profile.isActive
-    proxyLink = ""
     password = (try? KeychainStore.shared.proxyPassword(profileID: profile.id)) ?? ""
+    proxyLink = linkString(configuration: profile.configuration, password: password)
     results = []
     statusMessage = "正在编辑 \(profile.name)"
   }
@@ -378,6 +342,7 @@ struct ProxySettingsView: View {
       try? KeychainStore.shared.deleteProxyPassword(profileID: profile.id)
       await loadProfiles()
       await MainActor.run {
+        savedResults[profile.id] = nil
         if editingID == profile.id { resetEditor() }
         statusMessage = "代理已删除"
       }
@@ -397,17 +362,77 @@ struct ProxySettingsView: View {
   }
 
   private func testProxy() {
+    let parsed: ParsedAppProxyLink
+    do {
+      parsed = try AppProxyConfiguration.parse(link: proxyLink)
+    } catch {
+      statusMessage = error.localizedDescription
+      return
+    }
+    configuration = parsed.configuration
+    password = parsed.password
     isTesting = true
     results = []
     Task {
       let values = await ProxySpeedTester.run(
-        configuration: configuration,
-        password: password,
+        configuration: parsed.configuration,
+        password: parsed.password,
         targets: targets
       )
       await MainActor.run {
         results = values
         isTesting = false
+      }
+    }
+  }
+
+  private func linkString(configuration: AppProxyConfiguration, password: String) -> String {
+    var components = URLComponents()
+    components.scheme = configuration.kind == .socks5 ? "socks5" : "http"
+    components.host = configuration.normalizedHost
+    components.port = configuration.port
+    if !configuration.username.isEmpty {
+      components.user = configuration.username
+      if !password.isEmpty { components.password = password }
+    }
+    return components.string ?? ""
+  }
+
+  private func testSavedProfile(_ profile: AppProxyProfile) {
+    testingSavedProfileID = profile.id
+    savedResults[profile.id] = []
+    let password = (try? KeychainStore.shared.proxyPassword(profileID: profile.id)) ?? ""
+    Task {
+      let values = await ProxySpeedTester.run(
+        configuration: profile.configuration,
+        password: password,
+        targets: profile.targets
+      )
+      await MainActor.run {
+        savedResults[profile.id] = values
+        testingSavedProfileID = nil
+      }
+    }
+  }
+
+  @ViewBuilder private func probeRows(_ values: [ProxyProbeResult]) -> some View {
+    ForEach(values) { result in
+      HStack {
+        Text(result.name)
+        Spacer()
+        if let latency = result.latencyMilliseconds {
+          Text("\(latency) ms")
+            .font(.system(.body, design: .monospaced).weight(.semibold))
+            .foregroundStyle(latencyColor(latency))
+        } else {
+          Text("失败").foregroundStyle(.red)
+        }
+      }
+      if let error = result.errorMessage {
+        Text(error)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(3)
       }
     }
   }

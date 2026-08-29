@@ -57,7 +57,7 @@ private enum HistoryChartMode: String, CaseIterable, Identifiable {
 
   var systemImage: String {
     switch self {
-    case .ring: "chart.donut"
+    case .ring: "chart.pie.fill"
     case .bar: "chart.bar.fill"
     case .line: "chart.xyaxis.line"
     case .heatmap: "square.grid.3x3.fill"
@@ -256,15 +256,15 @@ private struct CodexOfficialTokenActivityCard: View {
 
       ScrollViewReader { reader in
         ScrollView(.horizontal, showsIndicators: false) {
-          HStack(alignment: .top, spacing: 3) {
+          HStack(alignment: .top, spacing: 4) {
             ForEach(Array(weeks.enumerated()), id: \.offset) { item in
-              VStack(alignment: .leading, spacing: 4) {
+              VStack(alignment: .leading, spacing: 5) {
                 Text(monthLabel(for: item.element, isFirst: item.offset == 0))
-                  .font(.system(size: 8, weight: .medium))
+                  .font(.system(size: 10, weight: .semibold))
                   .foregroundStyle(theme.secondaryText)
                   .fixedSize()
-                  .frame(width: 10, height: 12, alignment: .leading)
-                VStack(spacing: 3) {
+                  .frame(width: 13, height: 16, alignment: .leading)
+                VStack(spacing: 4) {
                   ForEach(item.element.days) { day in
                     heatmapCell(day)
                   }
@@ -280,14 +280,14 @@ private struct CodexOfficialTokenActivityCard: View {
           reader.scrollTo(last.id, anchor: .trailing)
         }
       }
-      .frame(height: 111)
+      .frame(height: 140)
 
       HStack(spacing: 5) {
         Text("低")
         ForEach(1...5, id: \.self) { level in
           RoundedRectangle(cornerRadius: 2)
             .fill(color(level: level))
-            .frame(width: 11, height: 11)
+            .frame(width: 13, height: 13)
         }
         Text("高")
         Spacer()
@@ -298,7 +298,7 @@ private struct CodexOfficialTokenActivityCard: View {
             .foregroundStyle(theme.accent(for: .codex))
         }
       }
-      .font(.system(size: 9, weight: .medium))
+      .font(.system(size: 10, weight: .medium))
       .foregroundStyle(theme.secondaryText)
       .lineLimit(1)
       .minimumScaleFactor(0.68)
@@ -315,7 +315,7 @@ private struct CodexOfficialTokenActivityCard: View {
     } label: {
       RoundedRectangle(cornerRadius: 2.5)
         .fill(day.isFuture ? theme.surfaceRaised.opacity(0.45) : color(level: intensityLevel(day.value)))
-        .frame(width: 10, height: 10)
+        .frame(width: 13, height: 13)
         .overlay {
           RoundedRectangle(cornerRadius: 2.5)
             .stroke(
@@ -875,7 +875,7 @@ private struct HistoryChartCard: View {
             selectedHeatmapPoint = point
           } label: {
             Text(heatmapLabel(point))
-              .font(.system(size: 9, weight: .semibold, design: .rounded))
+              .font(.system(size: 11, weight: .semibold, design: .rounded))
               .foregroundStyle(heatmapRatio(point) > 0.55 ? Color.white : theme.primaryText)
               .lineLimit(1)
               .minimumScaleFactor(0.72)
@@ -910,7 +910,7 @@ private struct HistoryChartCard: View {
         Text("高")
         Spacer()
       }
-      .font(.system(size: 8, weight: .medium))
+      .font(.system(size: 10, weight: .medium))
       .foregroundStyle(theme.secondaryText)
 
       if let selected = selectedHeatmapPoint {
@@ -922,7 +922,7 @@ private struct HistoryChartCard: View {
             .fontWeight(.bold)
             .foregroundStyle(theme.accent(for: selected.provider))
         }
-        .font(.system(size: 10, weight: .medium))
+        .font(.system(size: 11, weight: .medium))
         .foregroundStyle(theme.secondaryText)
         .lineLimit(1)
         .minimumScaleFactor(0.72)

@@ -42,6 +42,19 @@ targets:
       path: AIQuotaApp/Info.plist
       properties:
         AIQuotaSingleProfile: true
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.trilogys.quotapulse.refresh
+        UIBackgroundModes:
+          - fetch
+        LSSupportsOpeningDocumentsInPlace: true
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: QuotaPulse JSON Configuration
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.json
+            CFBundleTypeExtensions:
+              - json
         CFBundleURLTypes:
           - CFBundleURLName: AIQuota
             CFBundleURLSchemes:

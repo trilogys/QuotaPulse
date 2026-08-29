@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.dp
 import com.trilogys.aiquota.core.PortableConfigManager
 import com.trilogys.aiquota.core.PortableImportMode
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun PortableConfigSection(onChanged: suspend () -> Unit) {
@@ -40,7 +42,7 @@ fun PortableConfigSection(onChanged: suspend () -> Unit) {
         Text("导入与导出", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Switch(checked = replace, onCheckedChange = { replace = it }); Text(if (replace) "替换现有账号" else "合并导入") }
         Button(onClick = { importLauncher.launch(arrayOf("application/json", "text/json", "application/octet-stream")) }) { Text("导入 QuotaPulse 配置") }
-        Button(onClick = { pendingExport = manager.export(false); exportLauncher.launch("ai-quota-native.json") }) { Text("导出配置（不含凭据）") }
+        Button(onClick = { pendingExport = manager.export(false); exportLauncher.launch(exportFilename()) }) { Text("导出配置（不含凭据）") }
         Button(onClick = { pendingSensitiveExport = true }) { Text("完整备份（含 Token / API Key）") }
         Text("完整备份可用于 iOS 与 Android 之间迁移登录状态。文件包含敏感凭据，请只保存到可信位置。", style = MaterialTheme.typography.bodySmall)
         if (status.isNotBlank()) Text(status)
@@ -50,10 +52,12 @@ fun PortableConfigSection(onChanged: suspend () -> Unit) {
         onDismissRequest = { pendingSensitiveExport = false },
         title = { Text("完整备份包含敏感凭据") },
         text = { Text("任何获得此文件的人都可能取得其中的 API Key、Access Token 或 Refresh Token。不要上传到公开网盘、聊天群或 GitHub。") },
-        confirmButton = { TextButton(onClick = { pendingSensitiveExport = false; pendingExport = manager.export(true); exportLauncher.launch("ai-quota-native-full.json") }) { Text("继续导出") } },
+        confirmButton = { TextButton(onClick = { pendingSensitiveExport = false; pendingExport = manager.export(true); exportLauncher.launch(exportFilename()) }) { Text("继续导出") } },
         dismissButton = { TextButton(onClick = { pendingSensitiveExport = false }) { Text("取消") } }
     )
 }
+
+private fun exportFilename():String = "QuotaPulse-backup-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))}.json"
 
 private fun writeText(context: Context, uri: Uri, value: String) {
     context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { it.write(value) } ?: error("Cannot write configuration")

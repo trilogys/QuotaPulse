@@ -106,7 +106,7 @@ final class KimiOAuthCoordinator: NSObject, SFSafariViewControllerDelegate {
     let id = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
     return [
       "X-Msh-Platform": "kimi_cli",
-      "X-Msh-Version": "ai-quota-native/\(AppConfig.version)",
+      "X-Msh-Version": "QuotaPulse/\(AppConfig.version)",
       "X-Msh-Device-Name": UIDevice.current.name,
       "X-Msh-Device-Model": UIDevice.current.model,
       "X-Msh-Os-Version": UIDevice.current.systemVersion,

@@ -27,6 +27,7 @@ struct ContentView: View {
   @State private var sortMode: AccountSortMode = .manual
   @State private var aggregateHistory = false
   @State private var overviewAutoRefreshSeconds = 0
+  @State private var lastSuccessfulRefreshAt: Date?
   @State private var apiProvider: ProviderID?
   @State private var apiCredentialTarget: AccountRecord?
   @State private var namingOAuthProvider: ProviderID?
@@ -46,6 +47,8 @@ struct ContentView: View {
             DashboardSummary(
               account: featuredAccount,
               snapshot: featuredAccount.flatMap { model.snapshots[$0.id] },
+              allAccounts: selectedProvider == nil ? enabledAccounts : [],
+              snapshots: model.snapshots,
               activeAccountCount: model.accounts.filter(\.isEnabled).count,
               providerCount: Set(model.accounts.filter(\.isEnabled).map(\.provider)).count,
               lastUpdatedAt: model.snapshots.values.map(\.fetchedAt).max()
@@ -81,10 +84,18 @@ struct ContentView: View {
         selectedTheme = await SharedStore.shared.dashboardTheme()
         aggregateHistory = await SharedStore.shared.aggregateHistory()
         overviewAutoRefreshSeconds = await SharedStore.shared.overviewAutoRefreshSeconds()
+        lastSuccessfulRefreshAt = await SharedStore.shared.lastSuccessfulRefreshAt()
         await model.load()
       }
       .task(id: overviewRefreshTaskID) {
         await runOverviewAutoRefresh()
+      }
+      .onChange(of: scenePhase) { phase in
+        guard phase == .active else { return }
+        Task {
+          await model.load()
+          lastSuccessfulRefreshAt = await SharedStore.shared.lastSuccessfulRefreshAt()
+        }
       }
       .alert(
         "错误",
@@ -173,6 +184,23 @@ struct ContentView: View {
     }
     .environment(\.dashboardTheme, selectedTheme)
     .preferredColorScheme(selectedTheme.preferredColorScheme)
+    .onOpenURL { url in
+      importSharedJSON(url)
+    }
+  }
+
+  private func importSharedJSON(_ url: URL) {
+    guard url.isFileURL else { return }
+    Task { @MainActor in
+      let accessed = url.startAccessingSecurityScopedResource()
+      defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+      do {
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
+        await model.importConfig(data, replace: false)
+      } catch {
+        model.errorMessage = "无法读取共享的 JSON：\(error.localizedDescription)"
+      }
+    }
   }
 
   private var header: some View {
@@ -186,6 +214,16 @@ struct ContentView: View {
           .font(.system(size: 30, weight: .bold))
           .lineLimit(1)
           .minimumScaleFactor(0.78)
+        Group {
+          if let refreshAt = homepageLastRefreshAt {
+            Text("上次刷新 \(refreshAt.formatted(date: .omitted, time: .shortened))")
+          } else {
+            Text("尚未成功刷新")
+          }
+        }
+        .font(.system(size: 10, weight: .medium))
+        .foregroundStyle(selectedTheme.secondaryText)
+        .lineLimit(1)
       }
       .layoutPriority(1)
       Spacer()
@@ -391,6 +429,12 @@ struct ContentView: View {
     namingOAuthProvider = provider
   }
 
+  private var homepageLastRefreshAt: Date? {
+    ([lastSuccessfulRefreshAt] + model.snapshots.values.map(\.fetchedAt))
+      .compactMap { $0 }
+      .max()
+  }
+
   private var overviewRefreshTaskID: String {
     "\(overviewAutoRefreshSeconds)-\(scenePhase == .active)"
   }
@@ -462,6 +506,8 @@ private struct DashboardSummary: View {
   @Environment(\.dashboardTheme) private var theme
   let account: AccountRecord?
   let snapshot: UsageSnapshot?
+  let allAccounts: [AccountRecord]
+  let snapshots: [UUID: UsageSnapshot]
   let activeAccountCount: Int
   let providerCount: Int
   let lastUpdatedAt: Date?
@@ -486,32 +532,43 @@ private struct DashboardSummary: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 18) {
-      HStack(alignment: .top) {
-        VStack(alignment: .leading, spacing: 5) {
-          Text(account?.label ?? "等待添加账号")
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(theme.secondaryText)
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-          Text(primaryValue)
-            .font(.system(size: 38, weight: .bold, design: .rounded))
-            .foregroundStyle(theme.primaryText)
-          Text(primaryLabel)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(accent)
+      if allAccounts.count > 1 {
+        ScrollView(.horizontal, showsIndicators: false) {
+          HStack(spacing: 18) {
+            ForEach(allAccounts) { item in
+              AccountOverviewRing(account: item, snapshot: snapshots[item.id])
+            }
+          }
+          .padding(.horizontal, 1)
         }
-        Spacer()
-        ZStack {
-          Circle().stroke(theme.surfaceRaised, lineWidth: 9)
-          Circle()
-            .trim(from: 0, to: progress ?? 0)
-            .stroke(accent, style: StrokeStyle(lineWidth: 9, lineCap: .round))
-            .rotationEffect(.degrees(-90))
-          Image(systemName: account == nil ? "chart.donut" : "bolt.fill")
-            .font(.system(size: 18, weight: .bold))
-            .foregroundStyle(accent)
+      } else {
+        HStack(alignment: .top) {
+          VStack(alignment: .leading, spacing: 5) {
+            Text(account?.label ?? "等待添加账号")
+              .font(.system(size: 13, weight: .semibold))
+              .foregroundStyle(theme.secondaryText)
+              .lineLimit(1)
+              .minimumScaleFactor(0.75)
+            Text(primaryValue)
+              .font(.system(size: 38, weight: .bold, design: .rounded))
+              .foregroundStyle(theme.primaryText)
+            Text(primaryLabel)
+              .font(.system(size: 11, weight: .medium))
+              .foregroundStyle(accent)
+          }
+          Spacer()
+          ZStack {
+            Circle().stroke(theme.surfaceRaised, lineWidth: 9)
+            Circle()
+              .trim(from: 0, to: progress ?? 0)
+              .stroke(accent, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+              .rotationEffect(.degrees(-90))
+            Image(systemName: account == nil ? "chart.pie.fill" : "bolt.fill")
+              .font(.system(size: 18, weight: .bold))
+              .foregroundStyle(accent)
+          }
+          .frame(width: 82, height: 82)
         }
-        .frame(width: 82, height: 82)
       }
 
       Divider().overlay(theme.border)
@@ -786,6 +843,10 @@ private struct SnapshotDashboardBody: View {
           .foregroundStyle(theme.secondaryText)
       }
 
+      if !snapshot.availableModels.isEmpty {
+        AvailableModelsRow(models: snapshot.availableModels, accent: accent)
+      }
+
       if let tokenUsage = snapshot.codexTokenUsage, tokenUsage.hasData {
         CodexTokenUsageSummaryView(
           usage: tokenUsage,
@@ -829,8 +890,81 @@ private struct SnapshotDashboardBody: View {
   private var hasCachedData: Bool {
     !snapshot.windows.isEmpty
       || !snapshot.metrics.isEmpty
+      || !snapshot.availableModels.isEmpty
       || snapshot.balance != nil
       || snapshot.codexTokenUsage?.hasData == true
+  }
+}
+
+private struct AvailableModelsRow: View {
+  @Environment(\.dashboardTheme) private var theme
+  let models: [String]
+  let accent: Color
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 7) {
+      HStack {
+        Label("可用模型", systemImage: "cpu")
+          .font(.system(size: 10, weight: .semibold))
+          .foregroundStyle(accent)
+        Spacer()
+        Text("\(models.count)")
+          .font(.system(size: 10, weight: .bold, design: .rounded))
+          .foregroundStyle(theme.secondaryText)
+      }
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 6) {
+          ForEach(models, id: \.self) { model in
+            Text(model)
+              .font(.system(size: 9, weight: .medium))
+              .lineLimit(1)
+              .padding(.horizontal, 7)
+              .frame(height: 24)
+              .background(theme.surfaceRaised, in: RoundedRectangle(cornerRadius: 4))
+          }
+        }
+      }
+    }
+  }
+}
+
+private struct AccountOverviewRing: View {
+  @Environment(\.dashboardTheme) private var theme
+  let account: AccountRecord
+  let snapshot: UsageSnapshot?
+
+  private var accent: Color { theme.accent(for: account.provider) }
+  private var progress: Double? {
+    snapshot?.windows.map(\.remainingPercent).min().map { min(1, max(0, $0 / 100)) }
+  }
+  private var value: String {
+    if let balance = snapshot?.balance { return "\(balance.symbol)\(String(format: "%.2f", balance.total))" }
+    if let progress { return "\(Int((progress * 100).rounded()))%" }
+    return "--"
+  }
+
+  var body: some View {
+    VStack(spacing: 7) {
+      ZStack {
+        Circle().stroke(theme.surfaceRaised, lineWidth: 7)
+        Circle()
+          .trim(from: 0, to: progress ?? (snapshot?.balance == nil ? 0 : 1))
+          .stroke(accent, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+          .rotationEffect(.degrees(-90))
+        Text(value)
+          .font(.system(size: 13, weight: .bold, design: .rounded))
+          .minimumScaleFactor(0.58)
+          .lineLimit(1)
+          .padding(6)
+      }
+      .frame(width: 72, height: 72)
+      Text(account.label)
+        .font(.system(size: 10, weight: .semibold))
+        .foregroundStyle(theme.secondaryText)
+        .lineLimit(1)
+        .minimumScaleFactor(0.68)
+        .frame(width: 84)
+    }
   }
 }
 
@@ -1189,14 +1323,14 @@ private enum AppIconChoice: String, CaseIterable, Identifiable {
 
   var alternateIconName: String? {
     switch self {
-    case .current: nil
-    case .classic: "AppIconClassic"
+    case .current: "AppIconClassic"
+    case .classic: nil
     case .night: "AppIconNight"
     }
   }
 
   static func resolve(alternateIconName: String?) -> AppIconChoice {
-    allCases.first { $0.alternateIconName == alternateIconName } ?? .current
+    allCases.first { $0.alternateIconName == alternateIconName } ?? .classic
   }
 }
 
@@ -1206,11 +1340,18 @@ struct SettingsView: View {
   @Binding var aggregateHistory: Bool
   @Binding var overviewAutoRefreshSeconds: Int
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.openURL) private var openURL
   @State private var autoMinutes = 15
+  @State private var refreshIntervalPreset = 15
+  @State private var customRefreshMinutes = 45
+  @State private var backgroundRefreshEnabled = true
   @State private var confirmingHistoryClear = false
-  @State private var selectedAppIcon: AppIconChoice = .current
+  @State private var selectedAppIcon: AppIconChoice = .classic
   @State private var isChangingAppIcon = false
   @State private var appIconError: String?
+  @State private var checkingForUpdate = false
+  @State private var availableUpdate: AvailableAppUpdate?
+  @State private var updateMessage: String?
 
   var body: some View {
     NavigationStack {
@@ -1273,23 +1414,29 @@ struct SettingsView: View {
             .font(.footnote)
             .foregroundStyle(.secondary)
         }
-        if AppConfig.isAppOnlyBuild {
-          Section("刷新") {
-            Label("支持单账号刷新、全部刷新和下拉刷新", systemImage: "arrow.clockwise")
-          }
-        } else {
-          Section("自动刷新") {
-            Picker("最早刷新间隔", selection: $autoMinutes) {
+        Section("后台刷新") {
+          Toggle("允许后台刷新", isOn: $backgroundRefreshEnabled)
+          if backgroundRefreshEnabled {
+            Picker("最早刷新间隔", selection: $refreshIntervalPreset) {
               Text("10 分钟").tag(10)
               Text("15 分钟").tag(15)
               Text("30 分钟").tag(30)
               Text("1 小时").tag(60)
               Text("2 小时").tag(120)
+              Text("自定义").tag(-1)
             }
-            Text("实际后台刷新由 iOS 调度；iOS 17 以上可直接使用小组件刷新按钮。")
-              .font(.footnote)
-              .foregroundStyle(.secondary)
+            if refreshIntervalPreset == -1 {
+              Stepper(
+                "自定义：\(customRefreshMinutes) 分钟",
+                value: $customRefreshMinutes,
+                in: 10...1_440,
+                step: 5
+              )
+            }
           }
+          Text("App 未被划掉时会向 iOS 申请后台刷新；具体执行时刻由系统根据电量、网络和使用习惯调度。")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
         }
         Section("数据") {
           NavigationLink {
@@ -1306,6 +1453,21 @@ struct SettingsView: View {
             Label("清除本机走势历史", systemImage: "trash")
           }
           .disabled(model.usageHistory.isEmpty)
+        }
+        Section("在线更新") {
+          Button {
+            checkForUpdate()
+          } label: {
+            HStack {
+              Label(checkingForUpdate ? "正在检查" : "检查更新", systemImage: "arrow.down.app")
+              Spacer()
+              if checkingForUpdate { ProgressView() }
+            }
+          }
+          .disabled(checkingForUpdate)
+          Text("可检查 GitHub Release；第三方签名安装仍需下载 IPA 后重新签名。")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
         }
         Section("隐私与本机存储") {
           Label("配置仅保存在本机", systemImage: "lock.shield")
@@ -1367,22 +1529,53 @@ struct SettingsView: View {
       } message: {
         Text("只会删除本机统计记录，不会删除账号或登录凭据。")
       }
+      .alert("在线更新", isPresented: Binding(get: { updateMessage != nil }, set: { if !$0 { updateMessage = nil } })) {
+        if let update = availableUpdate {
+          Button("打开发布页") { openURL(update.releaseURL) }
+        }
+        Button("好", role: .cancel) {
+          updateMessage = nil
+          availableUpdate = nil
+        }
+      } message: {
+        Text(updateMessage ?? "")
+      }
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("完成") { dismiss() }
         }
       }
       .task {
-        autoMinutes = await SharedStore.shared.autoRefreshMinutes()
+        let savedMinutes = await SharedStore.shared.autoRefreshMinutes()
+        autoMinutes = savedMinutes
+        if [10, 15, 30, 60, 120].contains(savedMinutes) {
+          refreshIntervalPreset = savedMinutes
+        } else {
+          refreshIntervalPreset = -1
+          customRefreshMinutes = savedMinutes
+        }
+        backgroundRefreshEnabled = await SharedStore.shared.backgroundRefreshEnabled()
         selectedAppIcon = AppIconChoice.resolve(
           alternateIconName: UIApplication.shared.alternateIconName
         )
       }
       .onChange(of: autoMinutes) { newValue in
-        guard !AppConfig.isAppOnlyBuild else { return }
         Task {
           await SharedStore.shared.setAutoRefreshMinutes(newValue)
           WidgetCenter.shared.reloadAllTimelines()
+          if backgroundRefreshEnabled { BackgroundRefreshManager.scheduleIfEnabled() }
+        }
+      }
+      .onChange(of: refreshIntervalPreset) { preset in
+        autoMinutes = preset > 0 ? preset : customRefreshMinutes
+      }
+      .onChange(of: customRefreshMinutes) { minutes in
+        if refreshIntervalPreset == -1 { autoMinutes = minutes }
+      }
+      .onChange(of: backgroundRefreshEnabled) { enabled in
+        Task {
+          await SharedStore.shared.setBackgroundRefreshEnabled(enabled)
+          BackgroundRefreshManager.setEnabled(enabled)
         }
       }
       .onChange(of: selectedTheme) { newTheme in
@@ -1418,6 +1611,26 @@ struct SettingsView: View {
           )
         } else {
           selectedAppIcon = choice
+        }
+      }
+    }
+  }
+
+  private func checkForUpdate() {
+    checkingForUpdate = true
+    availableUpdate = nil
+    Task {
+      do {
+        let update = try await UpdateChecker.check()
+        await MainActor.run {
+          availableUpdate = update
+          updateMessage = update.map { "发现新版本 \($0.version)" } ?? "当前已是最新版本"
+          checkingForUpdate = false
+        }
+      } catch {
+        await MainActor.run {
+          updateMessage = error.localizedDescription
+          checkingForUpdate = false
         }
       }
     }

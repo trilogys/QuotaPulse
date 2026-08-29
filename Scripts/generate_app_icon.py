@@ -212,8 +212,8 @@ def write_preview(name, master):
 
 def main():
     variants = [
-        ("AppIcon", "AppIconCurrentPreview", draw_current()),
-        ("AppIconClassic", "AppIconClassicPreview", draw_classic()),
+        ("AppIcon", "AppIconClassicPreview", draw_classic()),
+        ("AppIconClassic", "AppIconCurrentPreview", draw_current()),
         ("AppIconNight", "AppIconNightPreview", draw_night()),
     ]
     for icon_name, preview_name, image in variants:

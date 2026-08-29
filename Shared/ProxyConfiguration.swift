@@ -85,8 +85,10 @@ struct AppProxyConfiguration: Codable, Equatable, Sendable {
       ]
     }
     if !username.isEmpty {
-      values["ProxyUsername"] = username
-      values["ProxyPassword"] = password
+      values[kCFProxyUsernameKey as String] = username
+      values[kCFProxyPasswordKey as String] = password
+      values["HTTPUser"] = username
+      values["HTTPPassword"] = password
       values["SOCKSUser"] = username
       values["SOCKSPassword"] = password
     }

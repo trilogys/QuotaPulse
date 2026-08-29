@@ -253,7 +253,8 @@ actor UsageService {
       throw UsageError.http(result.statusCode, String(data: result.data, encoding: .utf8) ?? "")
     }
     let root = try result.jsonDictionary()
-    let modelCount = (root["data"] as? [[String: Any]])?.count ?? 0
+    let models = availableModelIDs(root)
+    let modelCount = models.count
     let adminUsage = try? await fetchOpenAIAdminUsage(base: base, credential: credential)
     return UsageSnapshot(
       accountID: account.id,
@@ -262,6 +263,7 @@ actor UsageService {
         UsageMetric(label: "认证", value: "API Key"),
         UsageMetric(label: "可用模型", value: "\(modelCount)"),
       ],
+      availableModels: models,
       codexTokenUsage: adminUsage?.tokenUsage,
       codexModelUsage: adminUsage?.modelUsage,
       authenticationMode: .apiKey,
@@ -618,7 +620,8 @@ actor UsageService {
       throw UsageError.http(result.statusCode, String(data: result.data, encoding: .utf8) ?? "")
     }
     let root = try result.jsonDictionary()
-    let modelCount = (root["data"] as? [[String: Any]])?.count ?? 0
+    let models = availableModelIDs(root)
+    let modelCount = models.count
     return UsageSnapshot(
       accountID: account.id,
       provider: .claude,
@@ -626,6 +629,7 @@ actor UsageService {
         UsageMetric(label: "认证", value: "API Key"),
         UsageMetric(label: "可用模型", value: "\(modelCount)"),
       ],
+      availableModels: models,
       authenticationMode: .apiKey,
       plan: "Anthropic API"
     )
@@ -665,7 +669,29 @@ actor UsageService {
       throw UsageError.http(result.statusCode, String(data: result.data, encoding: .utf8) ?? "")
     }
     let root = try result.jsonDictionary()
-    let modelCount = (root["data"] as? [[String: Any]])?.count ?? 0
+    let models = availableModelIDs(root)
+    let modelCount = models.count
+    let balanceResult = try? await http.send(
+      URL(string: "\(base)/users/me/balance")!,
+      headers: ["Authorization": "Bearer \(credential.accessToken)", "Accept": "application/json"]
+    )
+    let balance: BalanceSnapshot?
+    if let balanceResult,
+      (200..<300).contains(balanceResult.statusCode),
+      let root = try? balanceResult.jsonDictionary(),
+      let data = dictionary(root["data"]),
+      let available = number(data["available_balance"] ?? data["availableBalance"]) {
+      balance = BalanceSnapshot(
+        currency: "CNY",
+        symbol: "¥",
+        total: available,
+        granted: number(data["voucher_balance"] ?? data["voucherBalance"]) ?? 0,
+        toppedUp: number(data["cash_balance"] ?? data["cashBalance"]) ?? 0,
+        available: true
+      )
+    } else {
+      balance = nil
+    }
     return UsageSnapshot(
       accountID: account.id,
       provider: .kimi,
@@ -673,6 +699,8 @@ actor UsageService {
         UsageMetric(label: "认证", value: "API Key"),
         UsageMetric(label: "可用模型", value: "\(modelCount)"),
       ],
+      availableModels: models,
+      balance: balance,
       authenticationMode: .apiKey,
       plan: "Kimi API"
     )
@@ -705,6 +733,7 @@ actor UsageService {
   private func kimiDurationSeconds(_ value: [String: Any]) -> Int64 { let duration = int64(value["duration"]) ?? 0; let unit = (string(value["timeUnit"] ?? value["time_unit"]) ?? "").uppercased().replacingOccurrences(of: "TIME_UNIT_", with: ""); if unit.hasPrefix("SECOND") { return duration }; if unit.hasPrefix("MINUTE") { return duration*60 }; if unit.hasPrefix("HOUR") { return duration*3600 }; if unit.hasPrefix("DAY") { return duration*86_400 }; return 0 }
   private func parseKimiDetail(_ value: [String: Any], duration: Int64, id: String) -> UsageWindow? { guard let limit = number(value["limit"]), limit > 0 else { return nil }; let used = number(value["used"]) ?? (limit - (number(value["remaining"]) ?? limit)); var resetAt: Date?; for key in ["resetAt", "reset_at", "resetTime", "reset_time"] { if let parsed = flexibleDate(value[key]) { resetAt = parsed; break } }; if resetAt == nil { for key in ["resetIn", "reset_in", "ttl"] { if let seconds = int64(value[key]), seconds >= 0 { resetAt = Date().addingTimeInterval(TimeInterval(seconds)); break } } }; return UsageWindow(id: id, label: durationLabel(seconds: duration), remainingPercent: ((limit-used)/limit)*100, resetAt: resetAt) }
   private func numericMetrics(_ value: [String: Any], keys: [String]) -> [UsageMetric] { keys.compactMap { key in guard let value = number(value[key]) else { return nil }; return UsageMetric(label: displayLabel(key), value: formatNumber(value)) } }
+  private func availableModelIDs(_ root: [String: Any]) -> [String] { ((root["data"] as? [[String: Any]]) ?? []).compactMap { string($0["id"] ?? $0["name"]) }.sorted() }
   private func normalizedBaseURL(_ value: String?, fallback: String) -> String { (value?.trimmingCharacters(in: CharacterSet(charactersIn: "/"))).flatMap { $0.isEmpty ? nil : $0 } ?? fallback }
   private func apiV1BaseURL(_ value: String?, fallback: String) -> String { let base=normalizedBaseURL(value,fallback:fallback);return base.lowercased().hasSuffix("/v1") ? base:"\(base)/v1" }
   private func formBody(_ values: [String: String]) -> Data { values.map { "\(urlEncode($0.key))=\(urlEncode($0.value))" }.sorted().joined(separator: "&").data(using: .utf8) ?? Data() }

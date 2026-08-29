@@ -4,16 +4,32 @@ import UniformTypeIdentifiers
 struct BackupSettingsView: View {
   @ObservedObject var model: AppModel
   @State private var importing = false
+  @State private var importInProgress = false
+  @State private var importError: String?
   @State private var replaceOnImport = false
   @State private var exportDocument: PortableConfigDocument?
+  @State private var exportFilename = "QuotaPulse-backup"
   @State private var exporting = false
   @State private var pendingCredentialExport = false
 
   var body: some View {
     Form {
+      Section {
+        LabeledContent("导入与导出格式", value: "JSON")
+      }
       Section("导入") {
         Toggle("导入时替换现有账号", isOn: $replaceOnImport)
-        Button { importing = true } label: { Label("导入 QuotaPulse / Sub2API JSON", systemImage: "square.and.arrow.down") }
+        Button { importing = true } label: {
+          HStack {
+            Label(
+              importInProgress ? "正在导入" : "导入 QuotaPulse / Sub2API JSON",
+              systemImage: "square.and.arrow.down"
+            )
+            Spacer()
+            if importInProgress { ProgressView() }
+          }
+        }
+        .disabled(importInProgress)
         Text(replaceOnImport ? "会先移除现有账号和对应凭据，再导入文件。" : "默认合并导入；相同账号会更新，不会重复创建。")
           .font(.footnote).foregroundStyle(.secondary)
         Text("Sub2API 支持 OpenAI OAuth、Anthropic OAuth / Setup Token；单一账号代理会新增为命名代理并激活。")
@@ -27,15 +43,10 @@ struct BackupSettingsView: View {
       }
     }
     .navigationTitle("导入与导出")
-    .fileImporter(isPresented: $importing, allowedContentTypes: [.json, .data], allowsMultipleSelection: false) { result in
-      do {
-        guard let url = try result.get().first else { return }
-        let accessed = url.startAccessingSecurityScopedResource(); defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-        let data = try Data(contentsOf: url)
-        Task { await model.importConfig(data, replace: replaceOnImport) }
-      } catch { model.errorMessage = error.localizedDescription }
+    .fileImporter(isPresented: $importing, allowedContentTypes: [.json, .plainText, .data], allowsMultipleSelection: false) { result in
+      Task { await importFile(result) }
     }
-    .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .json, defaultFilename: "ai-quota-native") { result in
+    .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .json, defaultFilename: exportFilename) { result in
       if case .failure(let error) = result { model.errorMessage = error.localizedDescription }
       exportDocument = nil
     }
@@ -48,10 +59,47 @@ struct BackupSettingsView: View {
     .alert("完成", isPresented: Binding(get: { model.statusMessage != nil }, set: { if !$0 { model.statusMessage = nil } })) {
       Button("好", role: .cancel) { model.statusMessage = nil }
     } message: { Text(model.statusMessage ?? "") }
+    .alert("导入失败", isPresented: Binding(get: { importError != nil }, set: { if !$0 { importError = nil } })) {
+      Button("好", role: .cancel) { importError = nil }
+    } message: {
+      Text(importError ?? "")
+    }
   }
 
   private func prepareExport(includeCredentials: Bool) {
-    do { exportDocument = try model.exportConfig(includeCredentials: includeCredentials); exporting = true }
+    do {
+      exportFilename = "QuotaPulse-backup-\(exportTimestamp())"
+      exportDocument = try model.exportConfig(includeCredentials: includeCredentials)
+      exporting = true
+    }
     catch { model.errorMessage = error.localizedDescription }
+  }
+
+  private func exportTimestamp() -> String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = .current
+    formatter.dateFormat = "yyyyMMdd-HHmmss"
+    return formatter.string(from: .now)
+  }
+
+  @MainActor private func importFile(_ result: Result<[URL], Error>) async {
+    importInProgress = true
+    defer { importInProgress = false }
+    do {
+      guard let url = try result.get().first else {
+        throw PortableConfigError.invalidFormat
+      }
+      let accessed = url.startAccessingSecurityScopedResource()
+      defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+      let data = try Data(contentsOf: url, options: .mappedIfSafe)
+      await model.importConfig(data, replace: replaceOnImport)
+      if let error = model.errorMessage {
+        model.errorMessage = nil
+        importError = error
+      }
+    } catch {
+      importError = error.localizedDescription
+    }
   }
 }

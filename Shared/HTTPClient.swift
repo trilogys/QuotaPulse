@@ -85,11 +85,31 @@ struct HTTPClient: Sendable {
     }
     let delegate = ProxyAuthenticationDelegate(username: proxy.username, password: password)
     let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
-    let (data, response) = try await session.data(for: request)
+    let data: Data
+    let response: URLResponse
+    do {
+      (data, response) = try await session.data(for: request)
+    } catch {
+      throw proxyError(error, proxy: proxy)
+    }
     guard let http = response as? HTTPURLResponse else {
       throw UsageError.invalidResponse("No HTTP response")
     }
     return HTTPResult(data: data, response: http)
+  }
+
+  private func proxyError(_ error: Error, proxy: AppProxyConfiguration) -> Error {
+    guard proxy.isEnabled else { return error }
+    let failure = error as NSError
+    guard failure.domain == "kCFErrorDomainCFNetwork" else { return error }
+    switch abs(failure.code) {
+    case 306, 310:
+      return UsageError.refreshFailed("代理连接失败（CFNetwork \(abs(failure.code))）。请在设置中测试服务，并确认 HTTP 代理支持 HTTPS CONNECT。")
+    case 307:
+      return UsageError.refreshFailed("代理认证失败，请检查用户名和密码。")
+    default:
+      return error
+    }
   }
 }
 
