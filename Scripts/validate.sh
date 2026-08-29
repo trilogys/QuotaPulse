@@ -91,6 +91,7 @@ assert 'modelIds(body)' in android_usage and 'request("models")' in android_usag
 assert 'CredentialAuthenticationMode.API_KEY' in android_ui and 'snapshot.connectionLabel' in android_ui
 assert 'R.string.available_models' in android_ui
 assert all(value in android_ui for value in ['DashboardOverviewCard', 'AccountDashboardCard', 'ProviderFilterBar', 'AccountEditorSheet', 'SettingsSheet'])
+assert 'import androidx.compose.foundation.layout.weight' not in android_ui
 assert all(value in android_theme for value in ['DAYLIGHT', 'NEON', 'GRAPHITE', 'AURORA', 'DashboardThemePreferences', 'LocalDashboardPalette'])
 assert 'DashboardThemeOption.DAYLIGHT.name' in android_theme
 assert 'material-icons-extended' in android_gradle
