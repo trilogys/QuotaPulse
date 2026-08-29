@@ -13,18 +13,18 @@ QuotaPulse 支持 iOS 16.0 以上，并提供三种发行方式：
 1. 打开 **Actions → ipa → Run workflow**。
 2. 选择 `build_type = unsigned`。
 3. 如果你已经知道自己描述文件中的 Bundle ID / Widget Bundle ID / App Group，建议在 workflow 中填成对应值。
-4. 下载 artifact：`AIQuota-iOS-resign`。
+4. 下载 artifact：`QuotaPulse-iOS-resign`。
 
 Artifact 包含：
 
-- `AIQuota-resign.ipa` — 包含 Widget，仅用于支持 Extension 的重签工具
-- `AIQuota-resign.ipa.sha256`
-- `AIQuota-unsigned.ipa` — 与 resign 版内容相同的通用命名
-- `AIQuota-unsigned.ipa.sha256`
-- `AIQuota-unsigned-signing-info.txt`
+- `QuotaPulse-resign.ipa` — 包含 Widget，仅用于支持 Extension 的重签工具
+- `QuotaPulse-resign.ipa.sha256`
+- `QuotaPulse-unsigned.ipa` — 与 resign 版内容相同的通用命名
+- `QuotaPulse-unsigned.ipa.sha256`
+- `QuotaPulse-unsigned-signing-info.txt`
 - `QuotaPulse.ipa` — **单 App 兼容版，优先用于全能签/爱思助手**
-- `AIQuota-app-only-unsigned.ipa`
-- `AIQuota-app-only-signing-info.txt`
+- `QuotaPulse-app-only-unsigned.ipa`
+- `QuotaPulse-app-only-signing-info.txt`
 
 选择规则：
 
@@ -35,8 +35,8 @@ Artifact 包含：
   → 签名后安装
 
 有主 App + Widget 两份 profile，且工具支持 Extension
-  → AIQuota-resign.ipa
-  → 同时签名 AIQuota.app 与 AIQuotaWidget.appex
+  → QuotaPulse-resign.ipa
+  → 同时签名 QuotaPulse.app 与 QuotaPulseWidget.appex
   → 安装后检查小组件列表
 ```
 
@@ -48,17 +48,17 @@ IPA 是真实 iphoneos 构建，标准结构：
 
 ```text
 Payload/
-└─ AIQuota.app
+└─ QuotaPulse.app
    └─ PlugIns/
-      └─ AIQuotaWidget.appex
+      └─ QuotaPulseWidget.appex
 ```
 
 ### 全能签 / ESign
 
 原则上可用于 QuotaPulse，只要当前版本的签名工具能够：
 
-- 重签 `AIQuota.app`
-- 同时重签 `PlugIns/AIQuotaWidget.appex`
+- 重签 `QuotaPulse.app`
+- 同时重签 `PlugIns/QuotaPulseWidget.appex`
 - 为主 App 和 Widget 使用匹配的 provisioning profile
 - 保留/重建正确的 App Group entitlement
 - 保留/重建兼容的 Keychain access group
@@ -92,10 +92,10 @@ QuotaPulse 使用标准 IPA 结构，因此可以作为爱思助手等桌面签�
 
 GitHub Actions Secrets：
 
-- `AIQUOTA_P12_BASE64`
-- `AIQUOTA_P12_PASSWORD`
-- `AIQUOTA_APP_PROFILE_BASE64`
-- `AIQUOTA_WIDGET_PROFILE_BASE64`
+- `QUOTAPULSE_P12_BASE64`
+- `QUOTAPULSE_P12_PASSWORD`
+- `QUOTAPULSE_APP_PROFILE_BASE64`
+- `QUOTAPULSE_WIDGET_PROFILE_BASE64`
 
 不需要手工填写 Team ID / Bundle ID / App Group；workflow 会从 provisioning profiles 中推导并验证。
 
@@ -105,7 +105,7 @@ GitHub Actions Secrets：
 2. `build_type = signed`
 3. `release-testing`：适合 Ad Hoc / 注册设备分发
 4. `debugging`：适合 Development profile
-5. 下载 `AIQuota-signed-...`
+5. 下载 `QuotaPulse-signed-...`
 
 签名 workflow 会：
 
@@ -126,7 +126,7 @@ P12
         ↓
 验证 entitlements
         ↓
-AIQuota-signed.ipa
+QuotaPulse-signed.ipa
 ```
 
 ## 4. One-command local signed IPA on macOS
@@ -145,8 +145,8 @@ export P12_PASSWORD='your-p12-password'
 输出：
 
 ```text
-build/export/AIQuota-signed.ipa
-build/export/AIQuota-signed.ipa.sha256
+build/export/QuotaPulse-signed.ipa
+build/export/QuotaPulse-signed.ipa.sha256
 ```
 
 ## 5. Why two provisioning profiles?
@@ -154,9 +154,9 @@ build/export/AIQuota-signed.ipa.sha256
 QuotaPulse 不是只有一个 App：
 
 ```text
-AIQuota.app
+QuotaPulse.app
 └─ PlugIns/
-   └─ AIQuotaWidget.appex
+   └─ QuotaPulseWidget.appex
 ```
 
 Apple 把 Widget Extension 当成独立签名 bundle，因此 Widget 一般需要自己的 Bundle ID 和 provisioning profile。

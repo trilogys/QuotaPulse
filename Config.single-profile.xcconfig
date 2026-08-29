@@ -1,6 +1,6 @@
 // Single-profile compatibility build: no Widget Extension / App Group requirement.
 // Signing values are generated from the supplied provisioning profile.
-AIQUOTA_APP_BUNDLE_ID = com.example.aiquota
+QUOTAPULSE_APP_BUNDLE_ID = com.example.quotapulse
 #include? "SigningConfig.single-profile.xcconfig"
 IPHONEOS_DEPLOYMENT_TARGET = 16.0
 SWIFT_VERSION = 5.9
