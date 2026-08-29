@@ -22,7 +22,7 @@ WIDGET_ID="$(read_plist "$WIDGET_PLIST" CFBundleIdentifier)"
 EXPECTED_GROUP="$(read_plist "$APP_PLIST" AIQuotaAppGroup)"
 KEY_SUFFIX="$(read_plist "$APP_PLIST" AIQuotaKeychainSuffix)"
 
-echo "AI Quota re-signed IPA diagnostic"
+echo "QuotaPulse re-signed IPA diagnostic"
 echo "Main bundle:   $APP_ID"
 echo "Widget bundle: $WIDGET_ID"
 echo "Built group:   $EXPECTED_GROUP"
@@ -66,9 +66,9 @@ if [[ -f "$WIDGET/embedded.mobileprovision" ]]; then echo "OK: Widget embedded.m
 
 if [[ "$fail" -ne 0 ]]; then
   echo
-  echo "RESULT: FAIL — the re-signed IPA may install but AI Quota Widget/account sharing is not reliable."
+  echo "RESULT: FAIL — the re-signed IPA may install but QuotaPulse Widget/account sharing is not reliable."
   exit 1
 fi
 echo
-echo "RESULT: PASS — signatures and shared entitlements required by AI Quota are intact."
+echo "RESULT: PASS — signatures and shared entitlements required by QuotaPulse are intact."
 echo "Note: iOS can still delay WidgetKit background refresh; this check validates packaging/signing, not system scheduling frequency."

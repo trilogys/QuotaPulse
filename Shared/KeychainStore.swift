@@ -22,6 +22,9 @@ enum SharedCredentialAccessStatus: Sendable, Equatable {
 
 struct KeychainStore: Sendable {
   static let shared = KeychainStore()
+  private static let proxyService = "AIQuota.Proxy"
+  private static let proxyPasswordAccount = "default"
+  private static func proxyPasswordAccount(_ profileID: UUID) -> String { "profile.\(profileID.uuidString)" }
 
   private var accessGroup: String? {
     guard let suffix = Bundle.main.object(forInfoDictionaryKey: AppConfig.keychainSuffixInfoKey) as? String, !suffix.isEmpty else { return nil }
@@ -103,5 +106,64 @@ struct KeychainStore: Sendable {
   func deleteCredential(accountID: UUID) throws {
     let query=try credentialQuery([kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:AppConfig.keychainService,kSecAttrAccount as String:accountID.uuidString])
     let status=SecItemDelete(query as CFDictionary);guard status==errSecSuccess||status==errSecItemNotFound else{throw KeychainError.unexpectedStatus(status)}
+  }
+
+  func saveProxyPassword(_ password: String) throws {
+    try saveProxyPassword(password, profileID: AppProxyProfile.legacyID)
+  }
+
+  func saveProxyPassword(_ password: String, profileID: UUID) throws {
+    var query = try credentialQuery([
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: Self.proxyService,
+      kSecAttrAccount as String: Self.proxyPasswordAccount(profileID),
+    ])
+    SecItemDelete(query as CFDictionary)
+    guard !password.isEmpty else { return }
+    query[kSecValueData as String] = Data(password.utf8)
+    query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+    let status = SecItemAdd(query as CFDictionary, nil)
+    guard status == errSecSuccess else { throw KeychainError.unexpectedStatus(status) }
+  }
+
+  func proxyPassword() throws -> String {
+    try proxyPassword(profileID: AppProxyProfile.legacyID)
+  }
+
+  func proxyPassword(profileID: UUID) throws -> String {
+    var query = try credentialQuery([
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: Self.proxyService,
+      kSecAttrAccount as String: Self.proxyPasswordAccount(profileID),
+    ])
+    query[kSecReturnData as String] = true
+    query[kSecMatchLimit as String] = kSecMatchLimitOne
+    var result: CFTypeRef?
+    let status = SecItemCopyMatching(query as CFDictionary, &result)
+    if status == errSecItemNotFound, profileID == AppProxyProfile.legacyID {
+      query[kSecAttrAccount as String] = Self.proxyPasswordAccount
+      let legacyStatus = SecItemCopyMatching(query as CFDictionary, &result)
+      if legacyStatus == errSecItemNotFound { return "" }
+      guard legacyStatus == errSecSuccess else { throw KeychainError.unexpectedStatus(legacyStatus) }
+    } else if status == errSecItemNotFound {
+      return ""
+    } else {
+      guard status == errSecSuccess else { throw KeychainError.unexpectedStatus(status) }
+    }
+    guard let data = result as? Data, let password = String(data: data, encoding: .utf8)
+    else { throw KeychainError.invalidData }
+    return password
+  }
+
+  func deleteProxyPassword(profileID: UUID) throws {
+    let query = try credentialQuery([
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: Self.proxyService,
+      kSecAttrAccount as String: Self.proxyPasswordAccount(profileID),
+    ])
+    let status = SecItemDelete(query as CFDictionary)
+    guard status == errSecSuccess || status == errSecItemNotFound else {
+      throw KeychainError.unexpectedStatus(status)
+    }
   }
 }

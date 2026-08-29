@@ -30,19 +30,24 @@ struct PortableCredential: Codable, Sendable {
   var clientID: String?
   var baseURL: String?
   var deviceHeaders: [String: String]?
+  var authenticationMode: CredentialAuthenticationMode?
 
   init(_ value: Credential) {
-    accessToken=value.accessToken;refreshToken=value.refreshToken;idToken=value.idToken;accountID=value.accountID;expiresAt=value.expiresAt;clientID=value.clientID;baseURL=value.baseURL;deviceHeaders=value.deviceHeaders
+    accessToken=value.accessToken;refreshToken=value.refreshToken;idToken=value.idToken;accountID=value.accountID;expiresAt=value.expiresAt;clientID=value.clientID;baseURL=value.baseURL;deviceHeaders=value.deviceHeaders;authenticationMode=value.authenticationMode
   }
 
-  var credential: Credential { Credential(accessToken:accessToken,refreshToken:refreshToken,idToken:idToken,accountID:accountID,expiresAt:expiresAt,clientID:clientID,baseURL:baseURL,deviceHeaders:deviceHeaders) }
+  var credential: Credential { Credential(accessToken:accessToken,refreshToken:refreshToken,idToken:idToken,accountID:accountID,expiresAt:expiresAt,clientID:clientID,baseURL:baseURL,deviceHeaders:deviceHeaders,authenticationMode:authenticationMode) }
 }
 
 enum PortableConfigError: LocalizedError {
   case invalidFormat
   case unsupportedVersion(Int)
+  case unsupportedSub2APIVersion(Int)
   case invalidProvider(String)
-  var errorDescription:String? { switch self { case .invalidFormat:"不是 AI Quota 配置文件";case .unsupportedVersion(let v):"暂不支持配置版本 \(v)";case .invalidProvider(let p):"未知 Provider：\(p)" } }
+  case noSupportedSub2APIAccounts
+  case multipleSub2APIProxies
+  case invalidSub2APIProxy
+  var errorDescription:String? { switch self { case .invalidFormat:"不是受支持的 QuotaPulse / Sub2API 配置文件";case .unsupportedVersion(let v):"暂不支持配置版本 \(v)";case .unsupportedSub2APIVersion(let v):"暂不支持 Sub2API 配置版本 \(v)";case .invalidProvider(let p):"未知 Provider：\(p)";case .noSupportedSub2APIAccounts:"Sub2API 文件中没有可导入的 OpenAI / Anthropic 账号";case .multipleSub2APIProxies:"Sub2API 文件引用了多个不同代理，当前 App 只能使用一个全局代理";case .invalidSub2APIProxy:"Sub2API 代理缺少受支持的协议、主机或端口" } }
 }
 
 struct PortableConfigCodec {
@@ -61,5 +66,20 @@ struct PortableConfigCodec {
     guard config.format == "ai-quota-native" else { throw PortableConfigError.invalidFormat }
     guard config.version <= PortableConfig.currentVersion else { throw PortableConfigError.unsupportedVersion(config.version) }
     return config
+  }
+
+  static func decodeForImport(_ data: Data) throws -> PortableDecodedImport {
+    guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      throw PortableConfigError.invalidFormat
+    }
+    if root["format"] as? String == "ai-quota-native" {
+      return PortableDecodedImport(
+        config: try decode(data),
+        source: .quotaPulse,
+        proxy: nil,
+        skippedAccounts: 0
+      )
+    }
+    return try Sub2APIConfigCodec.decode(data)
   }
 }

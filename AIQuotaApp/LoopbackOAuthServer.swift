@@ -34,7 +34,7 @@ final class LoopbackOAuthServer: @unchecked Sendable {
 
   func start() async throws {
     let parameters = NWParameters.tcp
-    parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: port)
+    parameters.allowLocalEndpointReuse = true
     let listener = try NWListener(using: parameters, on: port)
     self.listener = listener
 
@@ -150,7 +150,7 @@ final class LoopbackOAuthServer: @unchecked Sendable {
       let html = """
         <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
         <style>body{font-family:-apple-system;background:#111;color:#fff;text-align:center;padding:48px}h2{margin-top:30vh}p{color:#aaa}</style></head>
-        <body><h2>Codex 登录成功</h2><p>可以返回 AI Quota。</p></body></html>
+        <body><h2>Codex 登录成功</h2><p>可以返回 QuotaPulse。</p></body></html>
         """
       self.reply(connection, status: "200 OK", body: html, contentType: "text/html; charset=utf-8")
       self.finishCallback(.success(url))

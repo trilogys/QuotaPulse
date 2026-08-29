@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import com.trilogys.aiquota.core.Credential
+import com.trilogys.aiquota.core.CredentialAuthenticationMode
 import com.trilogys.aiquota.core.UsageService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -114,7 +115,8 @@ class OAuthManager(
             accessToken = json.getString("access_token"),
             refreshToken = json.optString("refresh_token").takeIf { it.isNotBlank() },
             expiresAtEpochSeconds = json.optLong("expires_in").takeIf { it > 0 }?.let { System.currentTimeMillis() / 1000 + it },
-            clientId = UsageService.CLAUDE_CLIENT_ID
+            clientId = UsageService.CLAUDE_CLIENT_ID,
+            authenticationMode = CredentialAuthenticationMode.OAUTH
         )
     }
 
@@ -158,7 +160,8 @@ class OAuthManager(
                     refreshToken = body.optString("refresh_token").takeIf { it.isNotBlank() },
                     expiresAtEpochSeconds = body.optLong("expires_in").takeIf { it > 0 }?.let { System.currentTimeMillis() / 1000 + it },
                     clientId = UsageService.KIMI_CLIENT_ID,
-                    deviceHeaders = headers
+                    deviceHeaders = headers,
+                    authenticationMode = CredentialAuthenticationMode.OAUTH
                 )
             }
             when (body.optString("error")) {
@@ -193,7 +196,8 @@ class OAuthManager(
             refreshToken = json.optString("refresh_token").takeIf { it.isNotBlank() },
             idToken = idToken,
             accountId = findJwtClaim(idToken, "chatgpt_account_id"),
-            clientId = UsageService.CODEX_CLIENT_ID
+            clientId = UsageService.CODEX_CLIENT_ID,
+            authenticationMode = CredentialAuthenticationMode.OAUTH
         )
     }
 
@@ -207,7 +211,7 @@ class OAuthManager(
             val path = requestLine.split(" ").getOrNull(1) ?: error("Invalid OAuth callback")
             val host = if (server.localPort == 1455) "localhost" else "localhost:${server.localPort}"
             val callback = if (server.localPort == 1455) "http://localhost$path" else "http://$host$path"
-            val html = "<html><body><h3>AIQuota authorization complete.</h3><p>You can return to the app.</p></body></html>"
+            val html = "<html><body><h3>QuotaPulse authorization complete.</h3><p>You can return to the app.</p></body></html>"
             val bytes = html.toByteArray()
             socket.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
             socket.getOutputStream().write(bytes)
@@ -235,7 +239,7 @@ class OAuthManager(
 
     private fun kimiDeviceHeaders(): Map<String, String> = mapOf(
         "X-Msh-Platform" to "kimi_cli",
-        "X-Msh-Version" to "ai-quota-native/0.11.0",
+        "X-Msh-Version" to "QuotaPulse",
         "X-Msh-Device-Name" to Build.MODEL,
         "X-Msh-Device-Model" to Build.DEVICE,
         "X-Msh-Os-Version" to Build.VERSION.RELEASE,

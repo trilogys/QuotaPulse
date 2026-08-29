@@ -5,6 +5,9 @@ struct PortableImportResult: Sendable {
   let added: Int
   let updated: Int
   let credentialsImported: Int
+  let skippedAccounts: Int
+  let proxyImported: Bool
+  let source: PortableImportSource
 }
 
 enum PortableImportMode: Sendable {
@@ -16,7 +19,8 @@ actor PortableConfigImporter {
   static let shared = PortableConfigImporter()
 
   func importData(_ data: Data, mode: PortableImportMode = .merge) async throws -> PortableImportResult {
-    let config = try PortableConfigCodec.decode(data)
+    let decoded = try PortableConfigCodec.decodeForImport(data)
+    let config = decoded.config
     let keychain = KeychainStore.shared
     let existing = await SharedStore.shared.accounts()
     var resultAccounts = mode == .replace ? [] : existing
@@ -47,8 +51,24 @@ actor PortableConfigImporter {
 
     resultAccounts = resultAccounts.sorted { $0.sortOrder < $1.sortOrder }.enumerated().map { index, value in var copy=value;copy.sortOrder=index;return copy }
     await SharedStore.shared.saveAccounts(resultAccounts)
+    if let proxy = decoded.proxy {
+      let existingProfiles = await SharedStore.shared.proxyProfiles()
+      let existingProxy = existingProfiles.first {
+        $0.name == proxy.name && $0.configuration == proxy.configuration && $0.targets == proxy.targets
+      }
+      let profile = AppProxyProfile(
+        id: existingProxy?.id ?? UUID(),
+        name: proxy.name,
+        configuration: proxy.configuration,
+        targets: proxy.targets,
+        isActive: true,
+        createdAt: existingProxy?.createdAt ?? .now
+      )
+      await SharedStore.shared.upsertProxyProfile(profile)
+      try keychain.saveProxyPassword(proxy.password, profileID: profile.id)
+    }
     for account in resultAccounts { await SharedStore.shared.clearCooldown(accountID: account.id) }
     WidgetCenter.shared.reloadAllTimelines()
-    return PortableImportResult(added:added,updated:updated,credentialsImported:credentialsImported)
+    return PortableImportResult(added:added,updated:updated,credentialsImported:credentialsImported,skippedAccounts:decoded.skippedAccounts,proxyImported:decoded.proxy != nil,source:decoded.source)
   }
 }

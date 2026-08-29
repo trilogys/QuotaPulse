@@ -1,5 +1,31 @@
 import Foundation
 
+private final class ProxyAuthenticationDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+  let username: String
+  let password: String
+
+  init(username: String, password: String) {
+    self.username = username
+    self.password = password
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    task: URLSessionTask,
+    didReceive challenge: URLAuthenticationChallenge,
+    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+  ) {
+    if challenge.protectionSpace.isProxy(), !username.isEmpty {
+      completionHandler(
+        .useCredential,
+        URLCredential(user: username, password: password, persistence: .forSession)
+      )
+    } else {
+      completionHandler(.performDefaultHandling, nil)
+    }
+  }
+}
+
 struct HTTPResult {
   var data: Data
   var response: HTTPURLResponse
@@ -26,7 +52,9 @@ struct HTTPClient: Sendable {
     method: String = "GET",
     headers: [String: String] = [:],
     body: Data? = nil,
-    timeout: TimeInterval = 8
+    timeout: TimeInterval = 8,
+    proxyOverride: AppProxyConfiguration? = nil,
+    proxyPasswordOverride: String? = nil
   ) async throws -> HTTPResult {
     var request = URLRequest(url: url, timeoutInterval: timeout)
     request.httpMethod = method
@@ -40,12 +68,48 @@ struct HTTPClient: Sendable {
     config.requestCachePolicy = .reloadIgnoringLocalCacheData
     config.timeoutIntervalForRequest = timeout
     config.timeoutIntervalForResource = timeout + 2
-    let session = URLSession(configuration: config)
-    let (data, response) = try await session.data(for: request)
+    let proxy: AppProxyConfiguration
+    let password: String
+    if let proxyOverride {
+      proxy = proxyOverride
+      password = proxyPasswordOverride ?? ""
+    } else if let profile = await SharedStore.shared.activeProxyProfile(for: url) {
+      proxy = profile.configuration
+      password = (try? KeychainStore.shared.proxyPassword(profileID: profile.id)) ?? ""
+    } else {
+      proxy = .disabled
+      password = ""
+    }
+    if let dictionary = proxy.connectionProxyDictionary(password: password) {
+      config.connectionProxyDictionary = dictionary
+    }
+    let delegate = ProxyAuthenticationDelegate(username: proxy.username, password: password)
+    let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+    let data: Data
+    let response: URLResponse
+    do {
+      (data, response) = try await session.data(for: request)
+    } catch {
+      throw proxyError(error, proxy: proxy)
+    }
     guard let http = response as? HTTPURLResponse else {
       throw UsageError.invalidResponse("No HTTP response")
     }
     return HTTPResult(data: data, response: http)
+  }
+
+  private func proxyError(_ error: Error, proxy: AppProxyConfiguration) -> Error {
+    guard proxy.isEnabled else { return error }
+    let failure = error as NSError
+    guard failure.domain == "kCFErrorDomainCFNetwork" else { return error }
+    switch abs(failure.code) {
+    case 306, 310:
+      return UsageError.refreshFailed("代理连接失败（CFNetwork \(abs(failure.code))）。请在设置中测试服务，并确认 HTTP 代理支持 HTTPS CONNECT。")
+    case 307:
+      return UsageError.refreshFailed("代理认证失败，请检查用户名和密码。")
+    default:
+      return error
+    }
   }
 }
 

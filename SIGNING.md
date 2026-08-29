@@ -1,6 +1,6 @@
-# AI Quota Native — Signing Guide
+# QuotaPulse Signing Guide
 
-AI Quota contains **two independently signed bundles**:
+QuotaPulse contains **two independently signed bundles**:
 
 1. `AIQuotaApp` — main application
 2. `AIQuotaWidget` — Widget Extension (`.appex`)

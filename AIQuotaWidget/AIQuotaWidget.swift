@@ -30,7 +30,7 @@ private enum WidgetEntryLoader {
       cooldowns: [:],
       lastAttemptAt: .now,
       credentialAccessIssue: nil,
-      theme: .neon
+      theme: .daylight
     )
   }
 
@@ -200,7 +200,10 @@ struct AIQuotaWidgetView: View {
     } else {
       HStack(spacing: 8) {
         VStack(alignment: .leading, spacing: 2) {
-          Text("AI QUOTA").font(.system(size: family == .systemSmall ? 13 : 14, weight: .bold))
+          Text("QuotaPulse")
+            .font(.system(size: family == .systemSmall ? 12 : 14, weight: .bold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
           if family != .systemSmall {
             Text("额度总览").font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary)
           }
@@ -215,7 +218,10 @@ struct AIQuotaWidgetView: View {
   private var interactiveHeader: some View {
     HStack(spacing: 8) {
       VStack(alignment: .leading, spacing: 2) {
-        Text("AI QUOTA").font(.system(size: family == .systemSmall ? 13 : 14, weight: .bold))
+        Text("QuotaPulse")
+          .font(.system(size: family == .systemSmall ? 12 : 14, weight: .bold))
+          .lineLimit(1)
+          .minimumScaleFactor(0.78)
         if family != .systemSmall {
           Text("额度总览").font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary)
         }
@@ -303,8 +309,8 @@ struct AIQuotaWidgetView: View {
     }
     .padding(.horizontal, 8)
     .padding(.vertical, family == .systemSmall ? 6 : 7)
-    .background(entry.theme.surface, in: RoundedRectangle(cornerRadius: 6))
-    .overlay(RoundedRectangle(cornerRadius: 6).stroke(entry.theme.border, lineWidth: 1))
+    .background(entry.theme.surface, in: RoundedRectangle(cornerRadius: entry.theme.compactCardCornerRadius))
+    .overlay(RoundedRectangle(cornerRadius: entry.theme.compactCardCornerRadius).stroke(entry.theme.border, lineWidth: 1))
   }
 
   @available(iOS 17.0, *)
@@ -433,8 +439,8 @@ struct AIQuotaWidget: Widget {
     StaticConfiguration(kind: kind, provider: AIQuotaLegacyProvider()) { entry in
       AIQuotaWidgetView(entry: entry)
     }
-    .configurationDisplayName("AI 额度")
-    .description("Codex、Claude、Kimi 等 AI 额度。点小组件可打开 App 刷新。")
+    .configurationDisplayName("QuotaPulse")
+    .description("查看 Codex、Claude、Kimi 等服务的额度。点按可打开 App 刷新。")
     .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
   }
 }
@@ -451,8 +457,8 @@ struct AIQuotaInteractiveWidget: Widget {
     ) { entry in
       AIQuotaWidgetView(entry: entry)
     }
-    .configurationDisplayName("AI 额度")
-    .description("Codex、Claude、Kimi 等 AI 额度，支持选择 Provider 或账号并原地刷新。")
+    .configurationDisplayName("QuotaPulse")
+    .description("查看 AI 服务额度，支持选择服务或账号并原地刷新。")
     .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     .contentMarginsDisabled()
   }

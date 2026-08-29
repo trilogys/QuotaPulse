@@ -1,6 +1,6 @@
 # IPA quick start
 
-AIQuota 支持 iOS 16.0 以上，并提供三种发行方式：
+QuotaPulse 支持 iOS 16.0 以上，并提供三种发行方式：
 
 1. **App-only unsigned / re-sign IPA**：只有一套签名材料或使用全能签、爱思助手时的首选，不含 Widget。
 2. **Full unsigned / re-sign IPA**：包含 Widget，重签工具必须能处理 App Extension 和两份 profile。
@@ -22,7 +22,7 @@ Artifact 包含：
 - `AIQuota-unsigned.ipa` — 与 resign 版内容相同的通用命名
 - `AIQuota-unsigned.ipa.sha256`
 - `AIQuota-unsigned-signing-info.txt`
-- `AIQuota-app-only-resign.ipa` — **单 App 兼容版，优先用于全能签/爱思助手**
+- `QuotaPulse.ipa` — **单 App 兼容版，优先用于全能签/爱思助手**
 - `AIQuota-app-only-unsigned.ipa`
 - `AIQuota-app-only-signing-info.txt`
 
@@ -30,7 +30,7 @@ Artifact 包含：
 
 ```text
 只有 P12 + 一份主 App profile
-  → AIQuota-app-only-resign.ipa
+  → QuotaPulse.ipa
   → 在签名工具中导入 P12、密码和 profile
   → 签名后安装
 
@@ -55,7 +55,7 @@ Payload/
 
 ### 全能签 / ESign
 
-原则上可用于 AIQuota，只要当前版本的签名工具能够：
+原则上可用于 QuotaPulse，只要当前版本的签名工具能够：
 
 - 重签 `AIQuota.app`
 - 同时重签 `PlugIns/AIQuotaWidget.appex`
@@ -67,7 +67,7 @@ Payload/
 
 ### 爱思助手
 
-AIQuota 使用标准 IPA 结构，因此可以作为爱思助手等桌面签名/安装工具的输入包。实际是否能保留 Widget，取决于所用签名方式是否会同时正确重签嵌入的 `.appex` 以及对应 entitlements。
+QuotaPulse 使用标准 IPA 结构，因此可以作为爱思助手等桌面签名/安装工具的输入包。实际是否能保留 Widget，取决于所用签名方式是否会同时正确重签嵌入的 `.appex` 以及对应 entitlements。
 
 如果签完后出现“App 能打开但没有小组件”，优先检查：
 
@@ -77,7 +77,7 @@ AIQuota 使用标准 IPA 结构，因此可以作为爱思助手等桌面签名/
 4. 两个 profile 是否允许对应 App Group；
 5. 主 App / Widget bundle ID 是否与 profile 匹配。
 
-> AIQuota 不依赖某个私有签名工具的特殊格式；它输出的是标准 IPA。若工具不能处理 Extension，请改用 `AIQuota-app-only-resign.ipa`。
+> QuotaPulse 不依赖某个私有签名工具的特殊格式；它输出的是标准 IPA。若工具不能处理 Extension，请改用 `QuotaPulse.ipa`。
 
 ## 3. P12 + mobileprovision signed IPA
 
@@ -151,7 +151,7 @@ build/export/AIQuota-signed.ipa.sha256
 
 ## 5. Why two provisioning profiles?
 
-AIQuota 不是只有一个 App：
+QuotaPulse 不是只有一个 App：
 
 ```text
 AIQuota.app
@@ -165,9 +165,9 @@ Apple 把 Widget Extension 当成独立签名 bundle，因此 Widget 一般需�
 
 ## 6. Runtime credential sharing
 
-AIQuota 的 OAuth token / API Key 存在共享 Keychain 中；App 和 Widget 通过 App Group / Keychain entitlement 协作。
+QuotaPulse 的 OAuth token / API Key 存在共享 Keychain 中；App 和 Widget 通过 App Group / Keychain entitlement 协作。
 
-unsigned IPA 无法预先知道最终 Apple application-identifier prefix，所以 AIQuota 只把 Keychain suffix 放进构建配置，最终前缀由实际签名环境决定。这样更适合后续使用自己的证书重签。
+unsigned IPA 无法预先知道最终 Apple application-identifier prefix，所以 QuotaPulse 只把 Keychain suffix 放进构建配置，最终前缀由实际签名环境决定。这样更适合后续使用自己的证书重签。
 
 ## Recommended path
 
@@ -175,7 +175,7 @@ unsigned IPA 无法预先知道最终 Apple application-identifier prefix，所�
 
 ```text
 只有一份主 App profile / 不需要小组件
-        → AIQuota-app-only-resign.ipa
+        → QuotaPulse.ipa
         → 全能签或爱思助手导入 P12 + profile 后签名安装
 
 已有 P12 + 主 App profile + Widget profile
@@ -186,7 +186,7 @@ unsigned IPA 无法预先知道最终 Apple application-identifier prefix，所�
 如果只有 P12 + 一份主 App profile，并习惯使用手机签名工具：
 
 ```text
-Actions 下载 AIQuota-app-only-resign.ipa
+Actions 下载 QuotaPulse.ipa
         → 全能签 / ESign
         → 签名主 App
         → 安装
@@ -195,7 +195,7 @@ Actions 下载 AIQuota-app-only-resign.ipa
 如果使用爱思助手：
 
 ```text
-Actions 下载 AIQuota-app-only-resign.ipa
+Actions 下载 QuotaPulse.ipa
         → 爱思助手签名/安装
         → 安装并在 App 内刷新
 ```

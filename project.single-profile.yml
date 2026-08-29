@@ -31,15 +31,30 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(AIQUOTA_APP_BUNDLE_ID)
         PROVISIONING_PROFILE_SPECIFIER: $(AIQUOTA_APP_PROFILE_SPECIFIER)
-        INFOPLIST_KEY_CFBundleDisplayName: AI Quota
+        INFOPLIST_KEY_CFBundleDisplayName: QuotaPulse
         INFOPLIST_KEY_AIQuotaSingleProfile: true
         INFOPLIST_KEY_UILaunchScreen_Generation: true
         GENERATE_INFOPLIST_FILE: true
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIconClassic AppIconNight"
+        ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: true
     info:
       path: AIQuotaApp/Info.plist
       properties:
         AIQuotaSingleProfile: true
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.trilogys.quotapulse.refresh
+        UIBackgroundModes:
+          - fetch
+        LSSupportsOpeningDocumentsInPlace: true
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: QuotaPulse JSON Configuration
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.json
+            CFBundleTypeExtensions:
+              - json
         CFBundleURLTypes:
           - CFBundleURLName: AIQuota
             CFBundleURLSchemes:

@@ -35,7 +35,7 @@ enum DashboardTheme: String, CaseIterable, Codable, Identifiable, Sendable {
     case .neon: Color(red: 0.035, green: 0.04, blue: 0.055)
     case .graphite: Color(red: 0.045, green: 0.05, blue: 0.055)
     case .aurora: Color(red: 0.025, green: 0.07, blue: 0.06)
-    case .daylight: Color(red: 0.95, green: 0.96, blue: 0.975)
+    case .daylight: Color(red: 0.94, green: 0.945, blue: 0.95)
     }
   }
 
@@ -44,7 +44,7 @@ enum DashboardTheme: String, CaseIterable, Codable, Identifiable, Sendable {
     case .neon: Color(red: 0.075, green: 0.055, blue: 0.13)
     case .graphite: Color(red: 0.075, green: 0.08, blue: 0.085)
     case .aurora: Color(red: 0.04, green: 0.12, blue: 0.10)
-    case .daylight: Color(red: 0.87, green: 0.91, blue: 0.95)
+    case .daylight: Color(red: 0.87, green: 0.88, blue: 0.89)
     }
   }
 
@@ -62,12 +62,12 @@ enum DashboardTheme: String, CaseIterable, Codable, Identifiable, Sendable {
     case .neon: Color(red: 0.115, green: 0.12, blue: 0.15)
     case .graphite: Color(red: 0.13, green: 0.135, blue: 0.14)
     case .aurora: Color(red: 0.09, green: 0.145, blue: 0.13)
-    case .daylight: Color(red: 0.91, green: 0.93, blue: 0.95)
+    case .daylight: Color(red: 0.925, green: 0.93, blue: 0.935)
     }
   }
 
   var border: Color {
-    self == .daylight ? Color.black.opacity(0.11) : Color.white.opacity(0.12)
+    self == .daylight ? Color.black.opacity(0.08) : Color.white.opacity(0.12)
   }
 
   var secondaryText: Color {
@@ -81,15 +81,15 @@ enum DashboardTheme: String, CaseIterable, Codable, Identifiable, Sendable {
     self == .daylight ? Color(red: 0.08, green: 0.09, blue: 0.12) : .white
   }
 
-  var cardCornerRadius: CGFloat { 22 }
-  var compactCardCornerRadius: CGFloat { 16 }
+  var cardCornerRadius: CGFloat { self == .daylight ? 24 : 22 }
+  var compactCardCornerRadius: CGFloat { self == .daylight ? 18 : 16 }
 
   var primary: Color {
     switch self {
     case .neon: Color(red: 0.49, green: 0.20, blue: 0.96)
     case .graphite: Color(red: 0.20, green: 0.76, blue: 0.60)
     case .aurora: Color(red: 0.22, green: 0.82, blue: 0.80)
-    case .daylight: Color(red: 0.27, green: 0.36, blue: 0.88)
+    case .daylight: Color(red: 0.93, green: 0.34, blue: 0.10)
     }
   }
 
@@ -98,13 +98,14 @@ enum DashboardTheme: String, CaseIterable, Codable, Identifiable, Sendable {
     case .neon: Color(red: 0.25, green: 0.82, blue: 0.80)
     case .graphite: Color(red: 0.95, green: 0.53, blue: 0.19)
     case .aurora: Color(red: 0.62, green: 0.34, blue: 0.94)
-    case .daylight: Color(red: 0.92, green: 0.39, blue: 0.20)
+    case .daylight: Color(red: 0.96, green: 0.10, blue: 0.28)
     }
   }
 
   var success: Color {
     switch self {
     case .graphite: Color(red: 0.33, green: 0.74, blue: 0.44)
+    case .daylight: Color(red: 0.16, green: 0.65, blue: 0.34)
     default: Color(red: 0.20, green: 0.78, blue: 0.45)
     }
   }
@@ -113,6 +114,13 @@ enum DashboardTheme: String, CaseIterable, Codable, Identifiable, Sendable {
 
   func accent(for provider: ProviderID) -> Color {
     switch (self, provider) {
+    case (.daylight, .codex): Color(red: 0.93, green: 0.34, blue: 0.10)
+    case (.daylight, .claude): Color(red: 0.96, green: 0.10, blue: 0.28)
+    case (.daylight, .kimi): Color(red: 0.16, green: 0.65, blue: 0.34)
+    case (.daylight, .deepseek): Color(red: 0.08, green: 0.58, blue: 0.55)
+    case (.daylight, .minimax): Color(red: 0.96, green: 0.60, blue: 0.10)
+    case (.daylight, .glm): Color(red: 0.24, green: 0.49, blue: 0.88)
+    case (.daylight, .copilot): Color(red: 0.54, green: 0.35, blue: 0.78)
     case (_, .codex): primary
     case (_, .claude): warning
     case (_, .kimi): success

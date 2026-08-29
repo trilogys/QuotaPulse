@@ -13,6 +13,7 @@ DerivedData/
 build/
 *.xcarchive
 *.ipa
+dist/
 xcuserdata/
 *.xcuserstate
 

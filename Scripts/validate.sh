@@ -27,8 +27,114 @@ theme=Path('Shared/DashboardTheme.swift').read_text(encoding='utf-8')
 store=Path('Shared/SharedStore.swift').read_text(encoding='utf-8')
 assert 'enum DashboardTheme' in theme
 assert all(case in theme for case in ['case neon', 'case graphite', 'case aurora', 'case daylight'])
+assert 'defaultValue: DashboardTheme = .daylight' in theme
 assert 'dashboardTheme' in store
+assert 'overviewAutoRefreshSeconds' in store
 print('dashboard themes: ok')
+
+proxy=Path('Shared/ProxyConfiguration.swift').read_text(encoding='utf-8')
+http=Path('Shared/HTTPClient.swift').read_text(encoding='utf-8')
+loopback=Path('AIQuotaApp/LoopbackOAuthServer.swift').read_text(encoding='utf-8')
+sub2api=Path('Shared/Sub2APIConfigImport.swift').read_text(encoding='utf-8')
+assert 'case http' in proxy and 'case socks5' in proxy
+assert 'connectionProxyDictionary' in http and 'ProxyAuthenticationDelegate' in http
+assert all(value in proxy for value in ['socket', 'socks5://', 'SOCKSEnable', 'SOCKSProxy', 'SOCKSUser'])
+assert 'kCFProxyUsernameKey' in proxy and 'case 306, 310' in http
+assert all(value in proxy for value in ['AppProxyProfile', 'AppProxyTarget', 'legacyID'])
+proxy_view=Path('AIQuotaApp/ProxySettingsView.swift').read_text(encoding='utf-8')
+assert all(value in proxy_view for value in ['测试服务', 'testSavedProfile', 'savedResults', 'latencyMilliseconds'])
+assert all(value not in proxy_view for value in ['Section("代理类型")', 'Section("服务器")', '解析代理链接'])
+assert all(value in store for value in ['proxyProfiles', 'activeProxyProfile', 'setProxyProfileActive'])
+assert 'profileID' in ks
+assert all(value in sub2api for value in ['sub2api-data', 'openai', 'anthropic', 'proxy_key', 'access_token'])
+assert 'decodeForImport' in Path('Shared/PortableConfig.swift').read_text(encoding='utf-8')
+assert 'requiredLocalEndpoint' not in loopback and 'allowLocalEndpointReuse' in loopback
+print('proxy / Sub2API import / OAuth networking: ok')
+
+history=Path('Shared/UsageHistory.swift').read_text(encoding='utf-8')
+history_view=Path('AIQuotaApp/UsageHistoryView.swift').read_text(encoding='utf-8')
+usage=Path('Shared/UsageService.swift').read_text(encoding='utf-8')
+assert 'UsageHistorySample' in history and 'UsageHistoryMetricKind' in history
+assert 'import Charts' in history_view
+assert all(value in history_view for value in ['case ring', 'case bar', 'case line', 'case heatmap'])
+assert 'chart.pie.fill' in history_view and 'chart.donut' not in history_view
+assert 'case tokens' in history and 'Codex OAuth 提供累计与每日 Token' in history_view
+assert all(value in history_view for value in ['CodexOfficialTokenActivityCard', '53 * 7', 'case daily', 'case weekly', 'case cumulative'])
+assert all(value in history_view for value in ['点按日期查看用量', 'selectedCell.dailyTokens', 'selectedHeatmapPoint = point', 'selectedHeatmapValues'])
+assert '.frame(width: 13, height: 13)' in history_view and '.font(.system(size: 10, weight: .semibold))' in history_view
+assert all(value in history_view for value in ['总计 Token', '峰值 Token', '当前连续天数', '最长连续天数'])
+assert 'aggregateHistory' in store and 'clearHistory' in store
+assert 'DeepSeek 官方余额接口只返回账户余额' in history_view
+assert 'rate-limit-reset-credits/consume' in usage
+assert all(value in usage for value in ['credit_id', 'redeem_request_id', 'queryCodexResetCredits', 'consumeCodexResetCredit'])
+assert '/wham/profiles/me' in usage and 'daily_usage_buckets' in usage
+assert all(value in usage for value in ['/wham/tasks?limit=50', '/wham/usage/thread_usage/query', 'queryCodexModelUsage'])
+assert all(value in usage for value in ['fetchOpenAIAPIKey', 'fetchClaudeAPIKey', 'fetchKimiAPIKey', 'organization/usage/completions'])
+assert 'users/me/balance' in usage
+assert 'fetchDeepSeek' in usage and r'\(base)/models' in usage
+models_text=Path('Shared/Models.swift').read_text(encoding='utf-8')
+assert 'codexTokenUsage' in models_text and 'CodexModelTokenUsage' in models_text
+assert 'CredentialAuthenticationMode' in models_text and 'case apiKey' in models_text
+print('OAuth token usage / local history / charts: ok')
+
+android_models=Path('android/app/src/main/java/com/trilogys/aiquota/core/Models.kt').read_text(encoding='utf-8')
+android_usage=Path('android/app/src/main/java/com/trilogys/aiquota/core/UsageService.kt').read_text(encoding='utf-8')
+android_ui=Path('android/app/src/main/java/com/trilogys/aiquota/MainActivity.kt').read_text(encoding='utf-8')
+android_portable_ui=Path('android/app/src/main/java/com/trilogys/aiquota/PortableConfigUi.kt').read_text(encoding='utf-8')
+android_theme=Path('android/app/src/main/java/com/trilogys/aiquota/ui/QuotaPulseTheme.kt').read_text(encoding='utf-8')
+android_gradle=Path('android/app/build.gradle.kts').read_text(encoding='utf-8')
+import xml.etree.ElementTree as ET
+assert 'CredentialAuthenticationMode' in android_models and 'connectionLabel' in android_models
+assert all(value in android_usage for value in ['fetchOpenAIKey', 'fetchClaudeKey', 'fetchKimiKey'])
+assert 'availableModels=models' in android_usage and 'availableModels' in android_models
+assert 'modelIds(body)' in android_usage and 'request("models")' in android_usage
+assert 'CredentialAuthenticationMode.API_KEY' in android_ui and 'snapshot.connectionLabel' in android_ui
+assert 'R.string.available_models' in android_ui
+assert all(value in android_ui for value in ['DashboardOverviewCard', 'AccountDashboardCard', 'ProviderFilterBar', 'AccountEditorSheet', 'SettingsSheet'])
+assert 'import androidx.compose.foundation.layout.weight' not in android_ui
+assert all(value in android_theme for value in ['DAYLIGHT', 'NEON', 'GRAPHITE', 'AURORA', 'DashboardThemePreferences', 'LocalDashboardPalette'])
+assert 'DashboardThemeOption.DAYLIGHT.name' in android_theme
+assert 'material-icons-extended' in android_gradle
+assert max(map(len, android_ui.splitlines())) < 180
+assert 'QuotaPulse-backup-' in android_portable_ui and 'yyyyMMdd-HHmmss' in android_portable_ui
+android_string_files=[Path('android/app/src/main/res/values/strings.xml'), Path('android/app/src/main/res/values-zh-rCN/strings.xml')]
+android_string_sets=[]
+for strings in android_string_files:
+    root=ET.parse(strings).getroot()
+    values={item.attrib.get('name'): item.text for item in root.findall('string')}
+    android_string_sets.append(set(values))
+    assert values.get('access_token') == 'Access Token / API Key', strings
+assert android_string_sets[0] == android_string_sets[1]
+print('Android OAuth / API key modes: ok')
+
+assets=Path('AIQuotaApp/Assets.xcassets')
+for name in ['AppIcon', 'AppIconClassic', 'AppIconNight']:
+    icons=list((assets / f'{name}.appiconset').glob('AppIcon-*.png'))
+    assert len(icons)==15, (name, len(icons))
+for name in ['AppIconCurrentPreview', 'AppIconClassicPreview', 'AppIconNightPreview']:
+    assert (assets / f'{name}.imageset' / 'preview.png').exists(), name
+print('AppIcon catalogs and Settings previews: ok')
+
+content=Path('AIQuotaApp/ContentView.swift').read_text(encoding='utf-8')
+icon_script=Path('Scripts/generate_app_icon.py').read_text(encoding='utf-8')
+assert 'case .classic: nil' in content and 'selectedAppIcon: AppIconChoice = .classic' in content
+assert '("AppIcon", "AppIconClassicPreview", draw_classic())' in icon_script
+background=Path('AIQuotaApp/BackgroundRefreshManager.swift').read_text(encoding='utf-8')
+backup=Path('AIQuotaApp/BackupSettingsView.swift').read_text(encoding='utf-8')
+assert all(value in background for value in ['BGAppRefreshTaskRequest', 'com.trilogys.quotapulse.refresh', 'scheduleIfEnabled'])
+assert all(value in store for value in ['backgroundRefreshEnabled', 'lastSuccessfulRefreshAt'])
+assert all(value in backup for value in ['.plainText', 'importInProgress', 'importError', '导入失败', '导入与导出格式', 'QuotaPulse-backup-', 'yyyyMMdd-HHmmss'])
+assert all(value in content for value in ['homepageLastRefreshAt', 'refreshIntervalPreset', 'customRefreshMinutes', 'importSharedJSON'])
+assert all(value in content for value in ['AccountOverviewRing', 'allAccounts.count > 1', 'checkForUpdate'])
+update=Path('AIQuotaApp/UpdateChecker.swift').read_text(encoding='utf-8')
+assert all(value in update for value in ['trilogys/QuotaPulse/releases/latest', 'AvailableAppUpdate', 'AppConfig.version'])
+assert 'availableModels' in models_text and 'AvailableModelsRow' in content
+assert 'users/me/balance' in usage and 'availableModelIDs' in usage
+readme=Path('README.md').read_text(encoding='utf-8')
+readme_zh=Path('README.zh-CN.md').read_text(encoding='utf-8')
+assert '[简体中文](README.zh-CN.md)' in readme and '[English](README.md)' in readme_zh
+assert readme.startswith('# QuotaPulse') and 'QuotaPulse is a native iOS and Android' in readme
+print('default icon / background refresh / JSON import: ok')
 
 models=Path('Shared/Models.swift').read_text(encoding='utf-8')
 health=Path('Shared/ProviderHealth.swift').read_text(encoding='utf-8')
@@ -47,25 +153,46 @@ echo "shell syntax: ok"
 grep -q 'AIQUOTA_APP_PROFILE_SPECIFIER' project.yml
 grep -q 'AIQUOTA_WIDGET_PROFILE_SPECIFIER' project.yml
 grep -q 'INFOPLIST_KEY_AIQuotaKeychainSuffix' project.yml
+grep -q 'com.trilogys.quotapulse.refresh' project.yml
+grep -q 'com.trilogys.quotapulse.refresh' project.single-profile.yml
+grep -q 'CFBundleDocumentTypes' project.yml
+grep -q 'CFBundleDocumentTypes' project.single-profile.yml
+grep -q 'public.json' project.yml
 grep -q '#include? "SigningConfig.xcconfig"' Config.xcconfig
 grep -q 'build_type:' .github/workflows/ipa.yml
 grep -q 'AIQuota-unsigned.ipa' .github/workflows/ipa.yml
 grep -q 'AIQuota-signed.ipa' .github/workflows/ipa.yml
+grep -q 'build/app-only-export/QuotaPulse.ipa' .github/workflows/ipa.yml
+grep -q 'RESIGN_IPA="$ROOT/$OUT_DIR/QuotaPulse.ipa"' Scripts/build_app_only_ipa.sh
 grep -q 'build_app_only_ipa.sh' .github/workflows/ipa.yml
 grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 16.0' Config.xcconfig
 grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 16.0' Config.single-profile.xcconfig
 grep -q 'AIQUOTA_RELEASE_STORE_FILE: ../release.keystore' .github/workflows/android.yml
+grep -q 'ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon' project.yml
+grep -q 'ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon' project.single-profile.yml
+grep -q 'ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIconClassic AppIconNight"' project.yml
+grep -q 'ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIconClassic AppIconNight"' project.single-profile.yml
+grep -q 'ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: true' project.yml
+grep -q 'ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: true' project.single-profile.yml
 echo "signing / IPA configuration: ok"
 
 python3 - <<'PY'
 from pathlib import Path
 widget=Path('AIQuotaWidget/AIQuotaWidget.swift').read_text(encoding='utf-8')
 content=Path('AIQuotaApp/ContentView.swift').read_text(encoding='utf-8')
+api_key=Path('AIQuotaApp/APIKeyEntryView.swift').read_text(encoding='utf-8')
 single=Path('project.single-profile.yml').read_text(encoding='utf-8')
 assert 'StaticConfiguration' in widget
 assert 'AppIntentConfiguration' in widget
 assert '#available(iOS 17.0, *)' in widget
 assert 'ContentUnavailableView' not in content
+assert 'newOAuthAccountName' in content and '账号名称（可选）' in api_key
+assert 'runOverviewAutoRefresh' in content and 'refreshAll(manual: false)' in content
+assert 'snapshots: model.snapshots' in content
+assert all(value in content for value in ['OpenAI / GPT · API Key', 'Claude · API Key', 'Kimi · API Key', '更新 Key'])
+assert 'authenticationMode:.apiKey' in Path('AIQuotaApp/AppModel.swift').read_text(encoding='utf-8')
+assert 'setAlternateIconName' in content and 'supportsAlternateIcons' in content
+assert all(value in content for value in ['AppIconClassic', 'AppIconNight', 'AppIconCurrentPreview'])
 assert 'RefreshIntents.swift' in single and 'WidgetConfigurationIntent.swift' in single
 assert Path('Scripts/build_app_only_ipa.sh').exists()
 print('iOS 16 / app-only compatibility contracts: ok')
