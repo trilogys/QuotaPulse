@@ -138,6 +138,7 @@ assert all(value in backup for value in ['.plainText', 'importInProgress', 'impo
 assert all(value in content for value in ['homepageLastRefreshAt', 'refreshIntervalPreset', 'customRefreshMinutes', 'importSharedJSON'])
 assert all(value in content for value in ['AccountOverviewRing', 'allAccounts.count > 1', 'checkForUpdate'])
 assert all(value in content for value in ['padding(.vertical, 5)', 'padding(.top, 4)', 'private var ringColor', 'theme.success'])
+assert all(value in content for value in ['didLoadInitialState', 'refreshOnActivationIfNeeded', 'force: true', 'refreshTimeText'])
 update=Path('QuotaPulseApp/UpdateChecker.swift').read_text(encoding='utf-8')
 assert all(value in update for value in ['trilogys/QuotaPulse/releases/latest', 'AvailableAppUpdate', 'AppConfig.version'])
 assert 'availableModels' in models_text and 'AvailableModelsRow' in content

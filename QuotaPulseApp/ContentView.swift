@@ -28,6 +28,7 @@ struct ContentView: View {
   @State private var aggregateHistory = false
   @State private var overviewAutoRefreshSeconds = 0
   @State private var lastSuccessfulRefreshAt: Date?
+  @State private var didLoadInitialState = false
   @State private var apiProvider: ProviderID?
   @State private var apiCredentialTarget: AccountRecord?
   @State private var namingOAuthProvider: ProviderID?
@@ -86,6 +87,8 @@ struct ContentView: View {
         overviewAutoRefreshSeconds = await SharedStore.shared.overviewAutoRefreshSeconds()
         lastSuccessfulRefreshAt = await SharedStore.shared.lastSuccessfulRefreshAt()
         await model.load()
+        didLoadInitialState = true
+        await refreshOnActivationIfNeeded()
       }
       .task(id: overviewRefreshTaskID) {
         await runOverviewAutoRefresh()
@@ -95,7 +98,12 @@ struct ContentView: View {
         Task {
           await model.load()
           lastSuccessfulRefreshAt = await SharedStore.shared.lastSuccessfulRefreshAt()
+          await refreshOnActivationIfNeeded()
         }
+      }
+      .onChange(of: overviewAutoRefreshSeconds) { seconds in
+        guard didLoadInitialState, seconds > 0, scenePhase == .active else { return }
+        Task { await refreshOnActivationIfNeeded(force: true) }
       }
       .alert(
         "错误",
@@ -216,7 +224,7 @@ struct ContentView: View {
           .minimumScaleFactor(0.78)
         Group {
           if let refreshAt = homepageLastRefreshAt {
-            Text("上次刷新 \(refreshAt.formatted(date: .omitted, time: .shortened))")
+            Text("上次刷新 \(refreshTimeText(refreshAt))")
           } else {
             Text("尚未成功刷新")
           }
@@ -436,11 +444,32 @@ struct ContentView: View {
   }
 
   private var overviewRefreshTaskID: String {
-    "\(overviewAutoRefreshSeconds)-\(scenePhase == .active)"
+    "\(didLoadInitialState)-\(overviewAutoRefreshSeconds)-\(scenePhase == .active)"
   }
 
+  @MainActor
+  private func refreshOnActivationIfNeeded(force: Bool = false) async {
+    guard didLoadInitialState,
+          scenePhase == .active,
+          overviewAutoRefreshSeconds > 0,
+          !model.isBusy else { return }
+    let storedRefreshAt = await SharedStore.shared.lastSuccessfulRefreshAt()
+    let latestRefreshAt = ([storedRefreshAt] + model.snapshots.values.map(\.fetchedAt))
+      .compactMap { $0 }
+      .max()
+    let isDue = latestRefreshAt.map {
+      Date().timeIntervalSince($0) >= TimeInterval(overviewAutoRefreshSeconds)
+    } ?? true
+    guard force || isDue else { return }
+    await model.refreshAll(manual: false)
+    lastSuccessfulRefreshAt = await SharedStore.shared.lastSuccessfulRefreshAt()
+  }
+
+  @MainActor
   private func runOverviewAutoRefresh() async {
-    guard scenePhase == .active, overviewAutoRefreshSeconds > 0 else { return }
+    guard didLoadInitialState,
+          scenePhase == .active,
+          overviewAutoRefreshSeconds > 0 else { return }
     while !Task.isCancelled {
       do {
         try await Task.sleep(nanoseconds: UInt64(overviewAutoRefreshSeconds) * 1_000_000_000)
@@ -448,7 +477,10 @@ struct ContentView: View {
         return
       }
       guard scenePhase == .active else { return }
-      if !model.isBusy { await model.refreshAll(manual: false) }
+      if !model.isBusy {
+        await model.refreshAll(manual: false)
+        lastSuccessfulRefreshAt = await SharedStore.shared.lastSuccessfulRefreshAt()
+      }
     }
   }
 
@@ -584,7 +616,7 @@ private struct DashboardSummary: View {
         SummaryMetric(value: "\(providerCount)", label: "平台")
         Divider().frame(height: 34).overlay(theme.border)
         SummaryMetric(
-          value: lastUpdatedAt?.formatted(date: .omitted, time: .shortened) ?? "--",
+          value: lastUpdatedAt.map(refreshTimeText) ?? "--",
           label: "最近更新"
         )
       }
@@ -873,7 +905,7 @@ private struct SnapshotDashboardBody: View {
       }
 
       HStack(spacing: 7) {
-        Text("更新 \(snapshot.fetchedAt.formatted(date: .omitted, time: .shortened))")
+        Text("更新 \(refreshTimeText(snapshot.fetchedAt))")
         if snapshot.stale {
           Text("缓存")
             .foregroundStyle(theme.warning)
@@ -1268,6 +1300,16 @@ private struct QuotaWindowRow: View {
   private var progressColor: Color {
     theme.success
   }
+}
+
+private func refreshTimeText(_ date: Date) -> String {
+  let components = Calendar.current.dateComponents([.hour, .minute, .second], from: date)
+  return String(
+    format: "%02d:%02d:%02d",
+    components.hour ?? 0,
+    components.minute ?? 0,
+    components.second ?? 0
+  )
 }
 
 private func statusColor(_ kind: ProviderErrorKind, theme: DashboardTheme) -> Color {
