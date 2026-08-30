@@ -516,6 +516,10 @@ private struct DashboardSummary: View {
     account.map { theme.accent(for: $0.provider) } ?? theme.primary
   }
 
+  private var quotaColor: Color {
+    snapshot?.balance == nil ? theme.success : accent
+  }
+
   private var progress: Double? {
     snapshot?.windows.map(\.remainingPercent).min().map { min(1, max(0, $0 / 100)) }
   }
@@ -540,6 +544,7 @@ private struct DashboardSummary: View {
             }
           }
           .padding(.horizontal, 1)
+          .padding(.vertical, 5)
         }
       } else {
         HStack(alignment: .top) {
@@ -554,18 +559,18 @@ private struct DashboardSummary: View {
               .foregroundStyle(theme.primaryText)
             Text(primaryLabel)
               .font(.system(size: 11, weight: .medium))
-              .foregroundStyle(accent)
+              .foregroundStyle(quotaColor)
           }
           Spacer()
           ZStack {
             Circle().stroke(theme.surfaceRaised, lineWidth: 9)
             Circle()
               .trim(from: 0, to: progress ?? 0)
-              .stroke(accent, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+              .stroke(quotaColor, style: StrokeStyle(lineWidth: 9, lineCap: .round))
               .rotationEffect(.degrees(-90))
             Image(systemName: account == nil ? "chart.pie.fill" : "bolt.fill")
               .font(.system(size: 18, weight: .bold))
-              .foregroundStyle(accent)
+              .foregroundStyle(quotaColor)
           }
           .frame(width: 82, height: 82)
         }
@@ -823,7 +828,7 @@ private struct SnapshotDashboardBody: View {
         }
       } else if !snapshot.windows.isEmpty {
         ForEach(snapshot.windows.prefix(3)) { window in
-          QuotaWindowRow(window: window, accent: accent)
+          QuotaWindowRow(window: window)
         }
       } else if !snapshot.metrics.isEmpty {
         HStack(spacing: 18) {
@@ -943,21 +948,27 @@ private struct AccountOverviewRing: View {
     return "--"
   }
 
+  private var ringColor: Color {
+    progress == nil ? accent : theme.success
+  }
+
   var body: some View {
     VStack(spacing: 7) {
       ZStack {
         Circle().stroke(theme.surfaceRaised, lineWidth: 7)
         Circle()
           .trim(from: 0, to: progress ?? (snapshot?.balance == nil ? 0 : 1))
-          .stroke(accent, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+          .stroke(ringColor, style: StrokeStyle(lineWidth: 7, lineCap: .round))
           .rotationEffect(.degrees(-90))
         Text(value)
           .font(.system(size: 13, weight: .bold, design: .rounded))
+          .foregroundStyle(progress == nil ? theme.primaryText : theme.success)
           .minimumScaleFactor(0.58)
           .lineLimit(1)
           .padding(6)
       }
       .frame(width: 72, height: 72)
+      .padding(.top, 4)
       Text(account.label)
         .font(.system(size: 10, weight: .semibold))
         .foregroundStyle(theme.secondaryText)
@@ -1222,7 +1233,6 @@ private struct CodexResetSchedule: View {
 private struct QuotaWindowRow: View {
   @Environment(\.dashboardTheme) private var theme
   let window: UsageWindow
-  let accent: Color
 
   var body: some View {
     VStack(spacing: 7) {
@@ -1256,9 +1266,7 @@ private struct QuotaWindowRow: View {
   }
 
   private var progressColor: Color {
-    if window.remainingPercent <= 15 { return .red }
-    if window.remainingPercent <= 35 { return theme.warning }
-    return accent
+    theme.success
   }
 }
 

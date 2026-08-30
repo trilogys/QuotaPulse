@@ -1,11 +1,14 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 struct BackupSettingsView: View {
   @ObservedObject var model: AppModel
   @State private var importing = false
   @State private var importInProgress = false
-  @State private var importError: String?
+  @State private var importFeedback: ImportFeedback?
+  @State private var importStatusText: String?
+  @State private var importStatusIsError = false
   @State private var replaceOnImport = false
   @State private var exportDocument: PortableConfigDocument?
   @State private var exportFilename = "QuotaPulse-backup"
@@ -19,7 +22,10 @@ struct BackupSettingsView: View {
       }
       Section("导入") {
         Toggle("导入时替换现有账号", isOn: $replaceOnImport)
-        Button { importing = true } label: {
+        Button {
+          importStatusText = nil
+          importing = true
+        } label: {
           HStack {
             Label(
               importInProgress ? "正在导入" : "导入 QuotaPulse / Sub2API JSON",
@@ -34,6 +40,14 @@ struct BackupSettingsView: View {
           .font(.footnote).foregroundStyle(.secondary)
         Text("Sub2API 支持 OpenAI OAuth、Anthropic OAuth / Setup Token；单一账号代理会新增为命名代理并激活。")
           .font(.footnote).foregroundStyle(.secondary)
+        if let importStatusText {
+          Label(
+            importStatusText,
+            systemImage: importStatusIsError ? "xmark.circle.fill" : "checkmark.circle.fill"
+          )
+          .font(.footnote)
+          .foregroundStyle(importStatusIsError ? Color.red : Color.green)
+        }
       }
       Section("导出") {
         Button { prepareExport(includeCredentials: false) } label: { Label("导出配置（不含凭据）", systemImage: "square.and.arrow.up") }
@@ -43,8 +57,13 @@ struct BackupSettingsView: View {
       }
     }
     .navigationTitle("导入与导出")
-    .fileImporter(isPresented: $importing, allowedContentTypes: [.json, .plainText, .data], allowsMultipleSelection: false) { result in
-      Task { await importFile(result) }
+    .sheet(isPresented: $importing) {
+      JSONDocumentPicker {
+        importing = false
+        Task { await importFile($0) }
+      } onCancel: {
+        importing = false
+      }
     }
     .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .json, defaultFilename: exportFilename) { result in
       if case .failure(let error) = result { model.errorMessage = error.localizedDescription }
@@ -56,13 +75,12 @@ struct BackupSettingsView: View {
     } message: {
       Text("任何拿到此文件的人都可能获得其中账号的 API Key、Access Token 或 Refresh Token。请勿发送到群聊、公开网盘或 GitHub。")
     }
-    .alert("完成", isPresented: Binding(get: { model.statusMessage != nil }, set: { if !$0 { model.statusMessage = nil } })) {
-      Button("好", role: .cancel) { model.statusMessage = nil }
-    } message: { Text(model.statusMessage ?? "") }
-    .alert("导入失败", isPresented: Binding(get: { importError != nil }, set: { if !$0 { importError = nil } })) {
-      Button("好", role: .cancel) { importError = nil }
-    } message: {
-      Text(importError ?? "")
+    .alert(item: $importFeedback) { feedback in
+      Alert(
+        title: Text(feedback.title),
+        message: Text(feedback.message),
+        dismissButton: .default(Text("好"))
+      )
     }
   }
 
@@ -83,23 +101,77 @@ struct BackupSettingsView: View {
     return formatter.string(from: .now)
   }
 
-  @MainActor private func importFile(_ result: Result<[URL], Error>) async {
+  @MainActor private func importFile(_ result: Result<URL, Error>) async {
     importInProgress = true
     defer { importInProgress = false }
     do {
-      guard let url = try result.get().first else {
-        throw PortableConfigError.invalidFormat
-      }
+      let url = try result.get()
       let accessed = url.startAccessingSecurityScopedResource()
       defer { if accessed { url.stopAccessingSecurityScopedResource() } }
       let data = try Data(contentsOf: url, options: .mappedIfSafe)
       await model.importConfig(data, replace: replaceOnImport)
       if let error = model.errorMessage {
         model.errorMessage = nil
-        importError = error
+        showImportFeedback(title: "导入失败", message: error, isError: true)
+      } else {
+        let message = model.statusMessage ?? "JSON 导入完成"
+        model.statusMessage = nil
+        showImportFeedback(title: "导入完成", message: message, isError: false)
       }
     } catch {
-      importError = error.localizedDescription
+      showImportFeedback(title: "导入失败", message: error.localizedDescription, isError: true)
+    }
+  }
+
+  private func showImportFeedback(title: String, message: String, isError: Bool) {
+    importStatusText = message
+    importStatusIsError = isError
+    importFeedback = ImportFeedback(title: title, message: message)
+  }
+}
+
+private struct ImportFeedback: Identifiable {
+  let id = UUID()
+  let title: String
+  let message: String
+}
+
+private struct JSONDocumentPicker: UIViewControllerRepresentable {
+  let onResult: (Result<URL, Error>) -> Void
+  let onCancel: () -> Void
+
+  func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+  func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+    let picker = UIDocumentPickerViewController(
+      forOpeningContentTypes: [.json, .plainText, .data],
+      asCopy: true
+    )
+    picker.allowsMultipleSelection = false
+    picker.delegate = context.coordinator
+    return picker
+  }
+
+  func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+
+  final class Coordinator: NSObject, UIDocumentPickerDelegate {
+    let parent: JSONDocumentPicker
+
+    init(parent: JSONDocumentPicker) { self.parent = parent }
+
+    func documentPicker(
+      _ controller: UIDocumentPickerViewController,
+      didPickDocumentsAt urls: [URL]
+    ) {
+      guard let url = urls.first else {
+        parent.onResult(.failure(PortableConfigError.invalidFormat))
+        return
+      }
+      parent.onResult(.success(url))
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+      parent.onCancel()
     }
   }
 }
