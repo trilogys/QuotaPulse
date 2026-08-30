@@ -598,6 +598,7 @@ private fun DashboardOverviewCard(
 private fun AccountOverviewRing(account: AccountRecord, snapshot: UsageSnapshot?) {
     val palette = LocalDashboardPalette.current
     val accent = palette.accent(account.provider)
+    val quotaColor = if (snapshot?.balance == null) palette.success else accent
     val progress = snapshot?.windows?.minOfOrNull { it.remainingPercent }
         ?.div(100.0)?.coerceIn(0.0, 1.0)?.toFloat()
         ?: if (snapshot?.balance?.available == true) 1f else 0f
@@ -610,13 +611,13 @@ private fun AccountOverviewRing(account: AccountRecord, snapshot: UsageSnapshot?
             CircularProgressIndicator(
                 progress = { progress },
                 modifier = Modifier.fillMaxSize(),
-                color = accent,
+                color = quotaColor,
                 trackColor = palette.surfaceRaised,
                 strokeWidth = 7.dp
             )
             Text(
                 value,
-                color = palette.primaryText,
+                color = if (snapshot?.balance == null) palette.success else palette.primaryText,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1
@@ -819,7 +820,7 @@ private fun AccountDashboardCard(
             }
 
             snapshot?.balance?.let { BalanceDisplay(it, accent) }
-            snapshot?.windows?.take(3)?.forEach { window -> QuotaWindowDisplay(window, accent) }
+            snapshot?.windows?.take(3)?.forEach { window -> QuotaWindowDisplay(window) }
 
             if (
                 snapshot == null ||
@@ -946,8 +947,9 @@ private fun BalanceDisplay(balance: BalanceSnapshot, accent: Color) {
 }
 
 @Composable
-private fun QuotaWindowDisplay(window: UsageWindow, accent: Color) {
+private fun QuotaWindowDisplay(window: UsageWindow) {
     val palette = LocalDashboardPalette.current
+    val quotaColor = palette.success
     val remaining = window.remainingPercent.coerceIn(0.0, 100.0)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -955,7 +957,7 @@ private fun QuotaWindowDisplay(window: UsageWindow, accent: Color) {
             Spacer(Modifier.weight(1f))
             Text(
                 "${remaining.roundToInt()}%",
-                color = accent,
+                color = quotaColor,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -973,7 +975,7 @@ private fun QuotaWindowDisplay(window: UsageWindow, accent: Color) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp),
-            color = accent,
+            color = quotaColor,
             trackColor = palette.surfaceRaised
         )
     }

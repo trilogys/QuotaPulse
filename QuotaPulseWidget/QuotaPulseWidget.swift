@@ -344,7 +344,7 @@ struct QuotaPulseWidgetView: View {
     } else if !snapshot.windows.isEmpty {
       HStack(spacing: family == .systemSmall ? 5 : 8) {
         ForEach(Array(snapshot.windows.prefix(family == .systemSmall ? 2 : 3))) {
-          quotaPill($0, provider: provider)
+          quotaPill($0)
         }
       }
     } else if !snapshot.metrics.isEmpty {
@@ -365,18 +365,20 @@ struct QuotaPulseWidgetView: View {
     }
   }
 
-  private func quotaPill(_ window: UsageWindow, provider: ProviderID) -> some View {
+  private func quotaPill(_ window: UsageWindow) -> some View {
     VStack(alignment: .leading, spacing: 2) {
       HStack(spacing: 2) {
         Text(window.label).foregroundStyle(.secondary)
-        Text("\(Int(window.remainingPercent.rounded()))%").fontWeight(.bold)
+        Text("\(Int(window.remainingPercent.rounded()))%")
+          .fontWeight(.bold)
+          .foregroundStyle(entry.theme.success)
       }
       .font(.system(size: 9))
       GeometryReader { proxy in
         ZStack(alignment: .leading) {
           Capsule().fill(Color.secondary.opacity(0.18))
           Capsule()
-            .fill(progressColor(window.remainingPercent, provider: provider))
+            .fill(entry.theme.success)
             .frame(width: max(2, proxy.size.width * window.remainingPercent / 100))
         }
       }
@@ -425,11 +427,6 @@ struct QuotaPulseWidgetView: View {
     return "\(max(1, minutes))m"
   }
 
-  private func progressColor(_ remaining: Double, provider: ProviderID) -> Color {
-    if remaining <= 15 { return .red }
-    if remaining <= 35 { return .orange }
-    return entry.theme.accent(for: provider)
-  }
 }
 
 struct QuotaPulseWidget: Widget {
