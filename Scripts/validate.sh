@@ -169,7 +169,8 @@ echo "shell syntax: ok"
 
 grep -q 'QUOTAPULSE_APP_PROFILE_SPECIFIER' project.yml
 grep -q 'QUOTAPULSE_WIDGET_PROFILE_SPECIFIER' project.yml
-grep -q 'INFOPLIST_KEY_QuotaPulseKeychainSuffix' project.yml
+test "$(grep -c 'QuotaPulseAppGroup: $(QUOTAPULSE_APP_GROUP)' project.yml)" -eq 2
+test "$(grep -c 'QuotaPulseKeychainSuffix: $(QUOTAPULSE_KEYCHAIN_SUFFIX)' project.yml)" -eq 2
 grep -q 'com.trilogys.quotapulse.refresh' project.yml
 grep -q 'com.trilogys.quotapulse.refresh' project.single-profile.yml
 grep -q 'CFBundleDocumentTypes' project.yml
