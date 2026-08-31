@@ -47,17 +47,25 @@ enum PortableConfigError: LocalizedError {
   case noSupportedSub2APIAccounts
   case multipleSub2APIProxies
   case invalidSub2APIProxy
-  var errorDescription:String? { switch self { case .invalidFormat:"不是受支持的 QuotaPulse / Sub2API 配置文件";case .unsupportedVersion(let v):"暂不支持配置版本 \(v)";case .unsupportedSub2APIVersion(let v):"暂不支持 Sub2API 配置版本 \(v)";case .invalidProvider(let p):"未知 Provider：\(p)";case .noSupportedSub2APIAccounts:"Sub2API 文件中没有可导入的 OpenAI / Anthropic 账号";case .multipleSub2APIProxies:"Sub2API 文件引用了多个不同代理，当前 App 只能使用一个全局代理";case .invalidSub2APIProxy:"Sub2API 代理缺少受支持的协议、主机或端口" } }
+  case credentialImportFailed(String, String)
+  var errorDescription:String? { switch self { case .invalidFormat:"不是受支持的 QuotaPulse / Sub2API 配置文件";case .unsupportedVersion(let v):"暂不支持配置版本 \(v)";case .unsupportedSub2APIVersion(let v):"暂不支持 Sub2API 配置版本 \(v)";case .invalidProvider(let p):"未知 Provider：\(p)";case .noSupportedSub2APIAccounts:"Sub2API 文件中没有可导入的 OpenAI / Anthropic 账号";case .multipleSub2APIProxies:"Sub2API 文件引用了多个不同代理，当前 App 只能使用一个全局代理";case .invalidSub2APIProxy:"Sub2API 代理缺少受支持的协议、主机或端口";case .credentialImportFailed(let label,let reason):"账号 \(label) 的凭据写入失败：\(reason)" } }
 }
 
 struct PortableConfigCodec {
   static func encode(accounts:[AccountRecord],keychain:KeychainStore = .shared,includeCredentials:Bool = true) throws -> Data {
-    let values=accounts.map { account in
-      let credential = includeCredentials ? (try? keychain.credential(accountID:account.id)).flatMap{$0}.map(PortableCredential.init) : nil
+    let values = try accounts.map { account in
+      let credential: PortableCredential?
+      if includeCredentials {
+        credential = try keychain.credential(accountID: account.id).map(PortableCredential.init)
+      } else {
+        credential = nil
+      }
       return PortableAccount(id:account.id,provider:account.provider.rawValue,label:account.label,providerAccountID:account.providerAccountID,isEnabled:account.isEnabled,sortOrder:account.sortOrder,createdAt:account.createdAt,credential:credential)
     }
     let encoder=JSONEncoder();encoder.outputFormatting=[.prettyPrinted,.sortedKeys,.withoutEscapingSlashes];encoder.dateEncodingStrategy = .iso8601
-    return try encoder.encode(PortableConfig(accounts:values))
+    let data = try encoder.encode(PortableConfig(accounts:values))
+    _ = try decode(data)
+    return data
   }
 
   static func decode(_ data:Data) throws -> PortableConfig {

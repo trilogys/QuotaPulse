@@ -60,7 +60,10 @@ assert all(value not in proxy_view for value in ['Section("代理类型")', 'Sec
 assert all(value in store for value in ['proxyProfiles', 'activeProxyProfile', 'setProxyProfileActive'])
 assert 'profileID' in ks
 assert all(value in sub2api for value in ['sub2api-data', 'openai', 'anthropic', 'proxy_key', 'access_token'])
-assert 'decodeForImport' in Path('Shared/PortableConfig.swift').read_text(encoding='utf-8')
+portable=Path('Shared/PortableConfig.swift').read_text(encoding='utf-8')
+portable_import=Path('Shared/PortableConfigImport.swift').read_text(encoding='utf-8')
+assert all(value in portable for value in ['decodeForImport', 'credentialImportFailed', '_ = try decode(data)'])
+assert all(value in portable_import for value in ['credentialImportFailed', 'private func saveCredential'])
 assert 'requiredLocalEndpoint' not in loopback and 'allowLocalEndpointReuse' in loopback
 print('proxy / Sub2API import / OAuth networking: ok')
 
@@ -138,7 +141,7 @@ background=Path('QuotaPulseApp/BackgroundRefreshManager.swift').read_text(encodi
 backup=Path('QuotaPulseApp/BackupSettingsView.swift').read_text(encoding='utf-8')
 assert all(value in background for value in ['BGAppRefreshTaskRequest', 'com.trilogys.quotapulse.refresh', 'scheduleIfEnabled'])
 assert all(value in store for value in ['backgroundRefreshEnabled', 'lastSuccessfulRefreshAt'])
-assert all(value in backup for value in ['.plainText', 'importInProgress', 'importFeedback', 'importStatusText', 'JSONDocumentPicker', 'onResult:', 'onCancel:', '导入失败', '导入与导出格式', 'QuotaPulse-backup-', 'yyyyMMdd-HHmmss'])
+assert all(value in backup for value in ['.plainText', 'importInProgress', 'importFeedback', 'importStatusText', 'JSONDocumentPicker', 'Result<Data, Error>', 'Data(contentsOf:', 'onResult:', 'onCancel:', '导入失败', '导入与导出格式', 'QuotaPulse-backup-', 'yyyyMMdd-HHmmss'])
 assert all(value in content for value in ['homepageLastRefreshAt', 'refreshIntervalPreset', 'customRefreshMinutes', 'importSharedJSON'])
 assert all(value in content for value in ['AccountOverviewRing', 'allAccounts.count > 1', 'checkForUpdate'])
 assert all(value in content for value in ['padding(.vertical, 5)', 'padding(.top, 4)', 'private var ringColor', 'theme.success'])

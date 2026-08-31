@@ -40,11 +40,17 @@ actor PortableConfigImporter {
         var merged = record
         if targetID != record.id { merged = AccountRecord(id:targetID,provider:provider,label:record.label,providerAccountID:record.providerAccountID,isEnabled:record.isEnabled,sortOrder:record.sortOrder,createdAt:resultAccounts[index].createdAt) }
         resultAccounts[index] = merged
-        if let credential = item.credential { try keychain.saveCredential(credential.credential,accountID:targetID);credentialsImported += 1 }
+        if let credential = item.credential {
+          try saveCredential(credential, accountID: targetID, label: item.label, keychain: keychain)
+          credentialsImported += 1
+        }
         updated += 1
       } else {
         resultAccounts.append(record)
-        if let credential = item.credential { try keychain.saveCredential(credential.credential,accountID:record.id);credentialsImported += 1 }
+        if let credential = item.credential {
+          try saveCredential(credential, accountID: record.id, label: item.label, keychain: keychain)
+          credentialsImported += 1
+        }
         added += 1
       }
     }
@@ -70,5 +76,18 @@ actor PortableConfigImporter {
     for account in resultAccounts { await SharedStore.shared.clearCooldown(accountID: account.id) }
     WidgetCenter.shared.reloadAllTimelines()
     return PortableImportResult(added:added,updated:updated,credentialsImported:credentialsImported,skippedAccounts:decoded.skippedAccounts,proxyImported:decoded.proxy != nil,source:decoded.source)
+  }
+
+  private func saveCredential(
+    _ credential: PortableCredential,
+    accountID: UUID,
+    label: String,
+    keychain: KeychainStore
+  ) throws {
+    do {
+      try keychain.saveCredential(credential.credential, accountID: accountID)
+    } catch {
+      throw PortableConfigError.credentialImportFailed(label, error.localizedDescription)
+    }
   }
 }

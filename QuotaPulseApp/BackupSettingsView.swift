@@ -104,14 +104,11 @@ struct BackupSettingsView: View {
     return formatter.string(from: .now)
   }
 
-  @MainActor private func importFile(_ result: Result<URL, Error>) async {
+  @MainActor private func importFile(_ result: Result<Data, Error>) async {
     importInProgress = true
     defer { importInProgress = false }
     do {
-      let url = try result.get()
-      let accessed = url.startAccessingSecurityScopedResource()
-      defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-      let data = try Data(contentsOf: url, options: .mappedIfSafe)
+      let data = try result.get()
       await model.importConfig(data, replace: replaceOnImport)
       if let error = model.errorMessage {
         model.errorMessage = nil
@@ -140,7 +137,7 @@ private struct ImportFeedback: Identifiable {
 }
 
 private struct JSONDocumentPicker: UIViewControllerRepresentable {
-  let onResult: (Result<URL, Error>) -> Void
+  let onResult: (Result<Data, Error>) -> Void
   let onCancel: () -> Void
 
   func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
@@ -170,7 +167,13 @@ private struct JSONDocumentPicker: UIViewControllerRepresentable {
         parent.onResult(.failure(PortableConfigError.invalidFormat))
         return
       }
-      parent.onResult(.success(url))
+      let accessed = url.startAccessingSecurityScopedResource()
+      defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+      do {
+        parent.onResult(.success(try Data(contentsOf: url, options: .mappedIfSafe)))
+      } catch {
+        parent.onResult(.failure(error))
+      }
     }
 
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
