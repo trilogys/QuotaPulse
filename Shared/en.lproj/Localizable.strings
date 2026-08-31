@@ -226,3 +226,11 @@
 "DeepSeek 显示官方 API 余额和可用模型，不伪装成 5h/周额度。" = "DeepSeek shows the official API balance and available models rather than presenting them as 5-hour or weekly quota windows.";
 "当周" = "Week";
 "%lld 天" = "%lld days";
+"网络路径" = "Network Route";
+"系统 VPN 已连接" = "System VPN Connected";
+"未检测到系统 VPN" = "No System VPN Detected";
+"重新检测 VPN" = "Check VPN Again";
+"QuotaPulse 当前优先使用系统 VPN；已激活的内部代理会暂时待命，断开 VPN 后自动恢复使用。" = "QuotaPulse is currently using the system VPN first. The active in-app proxy remains on standby and resumes automatically after the VPN disconnects.";
+"当前正常请求会使用已激活的 App 内代理；未激活内部代理时保持系统直连。" = "Normal requests currently use the active in-app proxy. Without an active in-app proxy, requests use the system connection directly.";
+"完整小组件需要 App / Widget 双 Profile" = "The full widget requires separate App and Widget profiles";
+"单 Profile 请使用 QuotaPulse.ipa；完整包需保留 App Group / Keychain" = "Use QuotaPulse.ipa with one profile. The full package must preserve App Group and Keychain access.";

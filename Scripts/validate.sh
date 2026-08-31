@@ -55,7 +55,7 @@ assert 'kCFProxyUsernameKey' in proxy and 'case 306, 310' in http
 assert all(value in proxy for value in ['AppProxyProfile', 'AppProxyTarget', 'legacyID'])
 proxy_view=Path('QuotaPulseApp/ProxySettingsView.swift').read_text(encoding='utf-8')
 assert all(value in proxy_view for value in ['测试服务', 'testSavedProfile', 'savedResults', 'latencyMilliseconds'])
-assert all(value in proxy_view for value in ['systemVPNActive', '系统 VPN 已连接', '优先使用系统 VPN', 'scenePhase', 'await SystemVPNDetector.isActive()'])
+assert all(value in proxy_view for value in ['systemVPNActive', 'isCheckingSystemVPN', 'updateSystemVPNStatus', '系统 VPN 已连接', '未检测到系统 VPN', '重新检测 VPN', 'scenePhase', 'await SystemVPNDetector.isActive()'])
 assert all(value not in proxy_view for value in ['Section("代理类型")', 'Section("服务器")', '解析代理链接'])
 assert all(value in store for value in ['proxyProfiles', 'activeProxyProfile', 'setProxyProfileActive'])
 assert 'profileID' in ks
