@@ -1,7 +1,7 @@
 import Foundation
 
 enum AppConfig {
-  static let version = "1.0.2"
+  static let version = "1.0.3"
   static var appGroup: String? {
     guard
       let value = Bundle.main.object(forInfoDictionaryKey: "QuotaPulseAppGroup") as? String,
