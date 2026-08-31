@@ -26,8 +26,8 @@ targets:
     sources:
       - path: Shared
       - path: QuotaPulseApp
-    resources:
       - path: Scriptable/QuotaPulseWidget.js
+        buildPhase: resources
     dependencies:
       - target: QuotaPulseWidget
         embed: true

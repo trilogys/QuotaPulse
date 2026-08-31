@@ -196,6 +196,8 @@ grep -q 'build_app_only_ipa.sh' .github/workflows/ipa.yml
 grep -q -- "- 'Scriptable/\*\*'" .github/workflows/ipa.yml
 test "$(grep -c 'path: Scriptable/QuotaPulseWidget.js' project.yml)" -eq 1
 test "$(grep -c 'path: Scriptable/QuotaPulseWidget.js' project.single-profile.yml)" -eq 1
+test "$(grep -c 'buildPhase: resources' project.yml)" -eq 1
+test "$(grep -c 'buildPhase: resources' project.single-profile.yml)" -eq 1
 grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 16.0' Config.xcconfig
 grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 16.0' Config.single-profile.xcconfig
 grep -q 'MARKETING_VERSION: 1.0.3' project.yml
