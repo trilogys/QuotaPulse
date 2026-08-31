@@ -49,11 +49,13 @@ loopback=Path('QuotaPulseApp/LoopbackOAuthServer.swift').read_text(encoding='utf
 sub2api=Path('Shared/Sub2APIConfigImport.swift').read_text(encoding='utf-8')
 assert 'case http' in proxy and 'case socks5' in proxy
 assert 'connectionProxyDictionary' in http and 'ProxyAuthenticationDelegate' in http
+assert all(value in http for value in ['SystemVPNDetector', 'getifaddrs', 'SystemVPNDetector.isActive()', 'finishTasksAndInvalidate'])
 assert all(value in proxy for value in ['socket', 'socks5://', 'SOCKSEnable', 'SOCKSProxy', 'SOCKSUser'])
 assert 'kCFProxyUsernameKey' in proxy and 'case 306, 310' in http
 assert all(value in proxy for value in ['AppProxyProfile', 'AppProxyTarget', 'legacyID'])
 proxy_view=Path('QuotaPulseApp/ProxySettingsView.swift').read_text(encoding='utf-8')
 assert all(value in proxy_view for value in ['测试服务', 'testSavedProfile', 'savedResults', 'latencyMilliseconds'])
+assert all(value in proxy_view for value in ['systemVPNActive', '系统 VPN 已连接', '优先使用系统 VPN'])
 assert all(value not in proxy_view for value in ['Section("代理类型")', 'Section("服务器")', '解析代理链接'])
 assert all(value in store for value in ['proxyProfiles', 'activeProxyProfile', 'setProxyProfileActive'])
 assert 'profileID' in ks
@@ -167,7 +169,8 @@ echo "shell syntax: ok"
 
 grep -q 'QUOTAPULSE_APP_PROFILE_SPECIFIER' project.yml
 grep -q 'QUOTAPULSE_WIDGET_PROFILE_SPECIFIER' project.yml
-grep -q 'INFOPLIST_KEY_QuotaPulseKeychainSuffix' project.yml
+test "$(grep -c 'QuotaPulseAppGroup: $(QUOTAPULSE_APP_GROUP)' project.yml)" -eq 2
+test "$(grep -c 'QuotaPulseKeychainSuffix: $(QUOTAPULSE_KEYCHAIN_SUFFIX)' project.yml)" -eq 2
 grep -q 'com.trilogys.quotapulse.refresh' project.yml
 grep -q 'com.trilogys.quotapulse.refresh' project.single-profile.yml
 grep -q 'CFBundleDocumentTypes' project.yml

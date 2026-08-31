@@ -45,13 +45,23 @@ PY
 
 APP_ID="$(plist_value "$APP/Info.plist" CFBundleIdentifier)"
 WIDGET_ID=""
+WIDGET_GROUP=""
+WIDGET_KEYCHAIN=""
 if [[ -n "$WIDGET" ]]; then
   WIDGET_ID="$(plist_value "$WIDGET/Info.plist" CFBundleIdentifier)"
+  WIDGET_GROUP="$(plist_value "$WIDGET/Info.plist" QuotaPulseAppGroup)"
+  WIDGET_KEYCHAIN="$(plist_value "$WIDGET/Info.plist" QuotaPulseKeychainSuffix)"
 fi
 GROUP="$(plist_value "$APP/Info.plist" QuotaPulseAppGroup)"
 KEYCHAIN="$(plist_value "$APP/Info.plist" QuotaPulseKeychainSuffix)"
 [[ -n "$APP_ID" ]] || { echo "FAIL: app bundle identifier missing" >&2; exit 1; }
 [[ "$EXPECT_WIDGET" == "0" || -n "$WIDGET_ID" ]] || { echo "FAIL: widget bundle identifier missing" >&2; exit 1; }
+if [[ "$EXPECT_WIDGET" == "1" ]]; then
+  [[ -n "$GROUP" ]] || { echo "FAIL: QuotaPulseAppGroup missing from app Info.plist" >&2; exit 1; }
+  [[ -n "$KEYCHAIN" ]] || { echo "FAIL: QuotaPulseKeychainSuffix missing from app Info.plist" >&2; exit 1; }
+  [[ "$WIDGET_GROUP" == "$GROUP" ]] || { echo "FAIL: app/widget Info.plist App Group values differ" >&2; exit 1; }
+  [[ "$WIDGET_KEYCHAIN" == "$KEYCHAIN" ]] || { echo "FAIL: app/widget Info.plist Keychain suffix values differ" >&2; exit 1; }
+fi
 
 printf 'App:     %s\n' "$APP_ID"
 if [[ "$EXPECT_WIDGET" == "1" ]]; then

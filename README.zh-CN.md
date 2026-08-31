@@ -40,6 +40,7 @@ QuotaPulse 不直接复制某一个项目的 UI，而是组合三个方向：
 - 可从 iOS“文件”共享 JSON 到 QuotaPulse，并自动合并导入
 - JSON 导出文件名包含本地时间戳，例如 `QuotaPulse-backup-20260829-103512.json`
 - 多个命名 HTTP(S) / SOCKS5 代理：链接导入、Codex / Claude 适用范围、单一激活项、账号密码与测速
+- 系统 VPN 优先；未连接系统 VPN 时自动恢复使用已激活的 App 内代理
 - 已保存代理可独立测速并显示各服务延迟
 - 代理只通过单条 HTTP(S) / SOCKS5 链接配置，不分散填写主机、端口和凭据
 - OAuth 与 API Key 账号创建时均可自定义显示名称

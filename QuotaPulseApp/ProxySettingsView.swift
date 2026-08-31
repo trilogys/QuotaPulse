@@ -86,9 +86,19 @@ struct ProxySettingsView: View {
   @State private var savedResults: [UUID: [ProxyProbeResult]] = [:]
   @State private var statusMessage: String?
   @State private var pendingDelete: AppProxyProfile?
+  @State private var systemVPNActive = false
 
   var body: some View {
     Form {
+      if systemVPNActive {
+        Section {
+          Label("系统 VPN 已连接", systemImage: "shield.lefthalf.filled")
+            .foregroundStyle(.green)
+          Text("QuotaPulse 当前优先使用系统 VPN；已激活的内部代理会暂时待命，断开 VPN 后自动恢复使用。")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+      }
       Section(editingID == nil ? "创建代理" : "编辑代理") {
         TextField("代理名称（可选）", text: $profileName)
           .textInputAutocapitalization(.never)
@@ -177,7 +187,10 @@ struct ProxySettingsView: View {
     .background(theme.background)
     .navigationTitle("网络代理")
     .navigationBarTitleDisplayMode(.inline)
-    .task { await loadProfiles() }
+    .task {
+      systemVPNActive = SystemVPNDetector.isActive()
+      await loadProfiles()
+    }
     .onChange(of: proxyLink) { _ in results = [] }
     .confirmationDialog(
       "删除代理？",
