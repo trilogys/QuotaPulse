@@ -234,3 +234,11 @@
 "当前正常请求会使用已激活的 App 内代理；未激活内部代理时保持系统直连。" = "当前正常请求会使用已激活的 App 内代理；未激活内部代理时保持系统直连。";
 "完整小组件需要 App / Widget 双 Profile" = "完整小组件需要 App / Widget 双 Profile";
 "单 Profile 请使用 QuotaPulse.ipa；完整包需保留 App Group / Keychain" = "单 Profile 请使用 QuotaPulse.ipa；完整包需保留 App Group / Keychain";
+"Scriptable 小组件" = "Scriptable 小组件";
+"导出 QuotaPulseWidget.js" = "导出 QuotaPulseWidget.js";
+"导出 Scriptable 配置（含凭据）" = "导出 Scriptable 配置（含凭据）";
+"先把 JS 文件加入 Scriptable，再在 Scriptable App 中运行脚本并选择配置 JSON。凭据会保存到 Scriptable 自己的 Keychain，随后小组件可独立刷新。" = "先把 JS 文件加入 Scriptable，再在 Scriptable App 中运行脚本并选择配置 JSON。凭据会保存到 Scriptable 自己的 Keychain，随后小组件可独立刷新。";
+"第三方兼容方案，风险由用户自行承担。Scriptable 只能使用系统网络或系统 VPN，不能读取 QuotaPulse 的 App 内代理。" = "第三方兼容方案，风险由用户自行承担。Scriptable 只能使用系统网络或系统 VPN，不能读取 QuotaPulse 的 App 内代理。";
+"导出高风险 Scriptable 配置" = "导出高风险 Scriptable 配置";
+"这是第三方兼容方案。导出的明文 JSON 会将 API Key、Access Token 和 Refresh Token 交给 Scriptable，凭据将离开 QuotaPulse Keychain。QuotaPulse 无法控制 Scriptable 的存储、同步、脚本修改或联网行为。继续导出表示你已理解并自行承担凭据泄露、账号异常及相关损失风险。导入后请立即删除 JSON 和“最近删除”中的副本。" = "这是第三方兼容方案。导出的明文 JSON 会将 API Key、Access Token 和 Refresh Token 交给 Scriptable，凭据将离开 QuotaPulse Keychain。QuotaPulse 无法控制 Scriptable 的存储、同步、脚本修改或联网行为。继续导出表示你已理解并自行承担凭据泄露、账号异常及相关损失风险。导入后请立即删除 JSON 和“最近删除”中的副本。";
+"我已了解风险，继续导出" = "我已了解风险，继续导出";

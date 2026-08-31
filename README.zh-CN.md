@@ -74,6 +74,18 @@ Codex 使用 browser OAuth + PKCE + iPhone 本机 localhost callback；日常刷
 
 Kimi Key 的公开接口可返回余额和模型列表，但不提供历史请求的逐模型 Token 用量；逐模型历史需要调用日志或网关日志，QuotaPulse 不会伪造该数据。
 
+### Scriptable 小组件桥接
+
+无法使用 App / Widget 双 Profile 签名原生小组件时，可以让 Scriptable 独立托管小组件：
+
+1. 在 QuotaPulse 打开 `设置 → 导入与导出 → Scriptable 小组件`。
+2. 导出 `QuotaPulseWidget.js` 并添加到 Scriptable。
+3. 导出敏感的 `QuotaPulse-Scriptable-*.json` 配置。
+4. 在 Scriptable App 内首次运行脚本，并选择该 JSON。
+5. 添加 Scriptable 桌面小组件并选择 `QuotaPulseWidget`。
+
+Scriptable 会把凭据保存在自己的 Keychain，独立查询 Provider，并在本机保存不含凭据的快照缓存。导入完成后应立即删除导出的 JSON。Scriptable 使用系统网络/VPN，不能使用 QuotaPulse App 内的 HTTP/SOCKS 代理。
+
 ### iOS IPA / 重签
 
 `Actions → ipa` 支持：

@@ -29,6 +29,8 @@ targets:
           - RefreshIntents.swift
           - WidgetConfigurationIntent.swift
       - path: QuotaPulseApp
+    resources:
+      - path: Scriptable/QuotaPulseWidget.js
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(QUOTAPULSE_APP_BUNDLE_ID)

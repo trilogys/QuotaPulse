@@ -66,6 +66,18 @@ QuotaPulse import and export files are standard JSON.
 
 Complete backups contain sensitive API keys and OAuth tokens. Store them only in a trusted location.
 
+## Scriptable Widget Bridge
+
+Users who cannot sign the native Widget extension with separate App and Widget profiles can use Scriptable as an independent widget host:
+
+1. Open `Settings → Import & Export → Scriptable Widget` in QuotaPulse.
+2. Export `QuotaPulseWidget.js` and add it to Scriptable.
+3. Export the sensitive `QuotaPulse-Scriptable-*.json` configuration.
+4. Run the script once inside the Scriptable app and select that JSON file.
+5. Add a Scriptable home-screen widget and select `QuotaPulseWidget`.
+
+Scriptable stores the imported credentials in its own Keychain, refreshes providers independently, and keeps a non-sensitive local snapshot cache. Delete the exported JSON immediately after importing it. Scriptable follows the system network/VPN and cannot use QuotaPulse's in-app HTTP/SOCKS proxy.
+
 ## iOS Packages
 
 The `ipa` GitHub Actions workflow produces unsigned, re-signable, and certificate-signed outputs.

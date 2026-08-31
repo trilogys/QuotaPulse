@@ -11,6 +11,7 @@ on:
       - 'Config.single-profile.xcconfig'
       - 'QuotaPulseApp/**'
       - 'QuotaPulseWidget/**'
+      - 'Scriptable/**'
       - 'Shared/**'
       - 'Scripts/build_unsigned_ipa.sh'
       - 'Scripts/build_app_only_ipa.sh'
