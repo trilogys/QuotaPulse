@@ -1,27 +1,47 @@
-import Darwin
 import Foundation
+import Network
 
-enum SystemVPNDetector {
+final class SystemVPNDetector: @unchecked Sendable {
+  static let shared = SystemVPNDetector()
   private static let interfacePrefixes = ["utun", "tun", "tap", "ppp", "ipsec", "wg"]
+  private let monitor = NWPathMonitor()
+  private let queue = DispatchQueue(label: "QuotaPulse.SystemVPNDetector")
+  private let lock = NSLock()
+  private var currentPath: NWPath?
 
-  static func isActive() -> Bool {
-    var addresses: UnsafeMutablePointer<ifaddrs>?
-    guard getifaddrs(&addresses) == 0, let first = addresses else { return false }
-    defer { freeifaddrs(first) }
+  private init() {
+    monitor.pathUpdateHandler = { [weak self] path in
+      guard let self else { return }
+      lock.lock()
+      currentPath = path
+      lock.unlock()
+    }
+    monitor.start(queue: queue)
+  }
 
-    var pointer: UnsafeMutablePointer<ifaddrs>? = first
-    while let current = pointer {
-      let interface = current.pointee
-      defer { pointer = interface.ifa_next }
-      guard let address = interface.ifa_addr else { continue }
-      let family = Int32(address.pointee.sa_family)
-      guard family == AF_INET || family == AF_INET6 else { continue }
-      let flags = Int32(interface.ifa_flags)
-      guard flags & IFF_UP != 0, flags & IFF_RUNNING != 0 else { continue }
-      let name = String(cString: interface.ifa_name).lowercased()
-      if interfacePrefixes.contains(where: { name.hasPrefix($0) }) { return true }
+  static func isActive() async -> Bool {
+    await shared.routeUsesVPN()
+  }
+
+  private func routeUsesVPN() async -> Bool {
+    for _ in 0..<10 {
+      if let path = pathSnapshot() {
+        guard path.status == .satisfied, path.usesInterfaceType(.other) else { return false }
+        return path.availableInterfaces.contains { interface in
+          interface.type == .other && Self.interfacePrefixes.contains {
+            interface.name.lowercased().hasPrefix($0)
+          }
+        }
+      }
+      try? await Task.sleep(nanoseconds: 20_000_000)
     }
     return false
+  }
+
+  private func pathSnapshot() -> NWPath? {
+    lock.lock()
+    defer { lock.unlock() }
+    return currentPath
   }
 }
 
@@ -98,7 +118,7 @@ struct HTTPClient: Sendable {
     if let proxyOverride {
       proxy = proxyOverride
       password = proxyPasswordOverride ?? ""
-    } else if SystemVPNDetector.isActive() {
+    } else if await SystemVPNDetector.isActive() {
       proxy = .disabled
       password = ""
     } else if let profile = await SharedStore.shared.activeProxyProfile(for: url) {

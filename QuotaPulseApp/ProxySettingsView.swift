@@ -71,6 +71,7 @@ private enum ProxySpeedTester {
 }
 
 struct ProxySettingsView: View {
+  @Environment(\.scenePhase) private var scenePhase
   @Environment(\.dashboardTheme) private var theme
   @State private var profiles: [AppProxyProfile] = []
   @State private var editingID: UUID?
@@ -188,8 +189,12 @@ struct ProxySettingsView: View {
     .navigationTitle("网络代理")
     .navigationBarTitleDisplayMode(.inline)
     .task {
-      systemVPNActive = SystemVPNDetector.isActive()
+      systemVPNActive = await SystemVPNDetector.isActive()
       await loadProfiles()
+    }
+    .onChange(of: scenePhase) { phase in
+      guard phase == .active else { return }
+      Task { systemVPNActive = await SystemVPNDetector.isActive() }
     }
     .onChange(of: proxyLink) { _ in results = [] }
     .confirmationDialog(
