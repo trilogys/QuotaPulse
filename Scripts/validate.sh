@@ -148,6 +148,8 @@ assert all(value in backup for value in ['Scriptable 小组件', 'prepareScriptE
 assert all(value in backup for value in ['第三方兼容方案', '风险由用户自行承担', '我已了解风险，继续导出', '最近删除'])
 assert all(value in scriptable_export for value in ['quotapulse-scriptable', 'missingCredential', 'PortableCredential', 'Bundle.main.url', 'refreshMinutes'])
 assert all(value in scriptable_script for value in ['DocumentPicker.openFile', 'Keychain.set', 'Keychain.get', 'Script.setWidget', 'refreshAfterDate', 'refreshWithCache', 'requestJSON', 'QuotaPulse.Scriptable.Config.v1'])
+assert 'fillRoundedRect' not in scriptable_script
+assert all(value in scriptable_script for value in ['fillCapsule', 'fillRect', 'fillEllipse'])
 assert Path('Scriptable/QuotaPulseWidget.js').exists()
 assert all(value in content for value in ['homepageLastRefreshAt', 'refreshIntervalPreset', 'customRefreshMinutes', 'importSharedJSON'])
 assert all(value in content for value in ['AccountOverviewRing', 'allAccounts.count > 1', 'checkForUpdate'])

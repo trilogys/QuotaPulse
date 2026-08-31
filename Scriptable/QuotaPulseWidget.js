@@ -532,11 +532,19 @@ function progressImage(ratio, width, height) {
   draw.size = new Size(width, height)
   draw.opaque = false
   draw.respectScreenScale = true
-  draw.setFillColor(Color.dynamic(new Color("#E5E7EA"), new Color("#303235")))
-  draw.fillRoundedRect(new Rect(0, 0, width, height), height / 2, height / 2)
-  draw.setFillColor(GREEN)
-  draw.fillRoundedRect(new Rect(0, 0, Math.max(height, width * clamp(ratio, 0, 1)), height), height / 2, height / 2)
+  fillCapsule(draw, 0, width, height, Color.dynamic(new Color("#E5E7EA"), new Color("#303235")))
+  fillCapsule(draw, 0, Math.max(height, width * clamp(ratio, 0, 1)), height, GREEN)
   return draw.getImage()
+}
+
+function fillCapsule(draw, x, width, height, color) {
+  const safeWidth = Math.max(height, width)
+  draw.setFillColor(color)
+  if (safeWidth > height) {
+    draw.fillRect(new Rect(x + height / 2, 0, safeWidth - height, height))
+  }
+  draw.fillEllipse(new Rect(x, 0, height, height))
+  draw.fillEllipse(new Rect(x + safeWidth - height, 0, height, height))
 }
 
 function snapshotSummary(snapshot) {
