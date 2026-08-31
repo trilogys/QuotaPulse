@@ -2,8 +2,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct PortableConfigDocument: FileDocument {
-  static var readableContentTypes: [UTType] { [.json, .data] }
-  static var writableContentTypes: [UTType] { [.json] }
+  static var readableContentTypes: [UTType] { [.json, .javaScript, .plainText, .data] }
+  static var writableContentTypes: [UTType] { [.json, .javaScript, .plainText] }
 
   var data: Data
 
