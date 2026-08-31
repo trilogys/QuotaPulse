@@ -256,15 +256,16 @@ struct QuotaPulseWidgetView: View {
     VStack(spacing: 6) {
       Image(systemName: "signature").font(.title3).foregroundStyle(.red)
       Text("签名权限异常").font(.caption).fontWeight(.bold).foregroundStyle(.red)
-      Text(family == .systemSmall ? "App 与小组件无法共享登录凭据" : reason)
+      Text(family == .systemSmall ? "完整小组件需要 App / Widget 双 Profile" : reason)
         .font(.system(size: family == .systemSmall ? 8 : 9))
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
         .lineLimit(3)
       if family != .systemSmall {
-        Text("请重新签名并保留 App Group / Keychain")
+        Text("单 Profile 请使用 QuotaPulse.ipa；完整包需保留 App Group / Keychain")
           .font(.system(size: 8, weight: .medium))
           .foregroundStyle(.secondary)
+          .lineLimit(2)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -226,3 +226,11 @@
 "DeepSeek 显示官方 API 余额和可用模型，不伪装成 5h/周额度。" = "DeepSeek 显示官方 API 余额和可用模型，不伪装成 5h/周额度。";
 "当周" = "当周";
 "%lld 天" = "%lld 天";
+"网络路径" = "网络路径";
+"系统 VPN 已连接" = "系统 VPN 已连接";
+"未检测到系统 VPN" = "未检测到系统 VPN";
+"重新检测 VPN" = "重新检测 VPN";
+"QuotaPulse 当前优先使用系统 VPN；已激活的内部代理会暂时待命，断开 VPN 后自动恢复使用。" = "QuotaPulse 当前优先使用系统 VPN；已激活的内部代理会暂时待命，断开 VPN 后自动恢复使用。";
+"当前正常请求会使用已激活的 App 内代理；未激活内部代理时保持系统直连。" = "当前正常请求会使用已激活的 App 内代理；未激活内部代理时保持系统直连。";
+"完整小组件需要 App / Widget 双 Profile" = "完整小组件需要 App / Widget 双 Profile";
+"单 Profile 请使用 QuotaPulse.ipa；完整包需保留 App Group / Keychain" = "单 Profile 请使用 QuotaPulse.ipa；完整包需保留 App Group / Keychain";

@@ -71,6 +71,7 @@ private enum ProxySpeedTester {
 }
 
 struct ProxySettingsView: View {
+  @Environment(\.scenePhase) private var scenePhase
   @Environment(\.dashboardTheme) private var theme
   @State private var profiles: [AppProxyProfile] = []
   @State private var editingID: UUID?
@@ -87,17 +88,38 @@ struct ProxySettingsView: View {
   @State private var statusMessage: String?
   @State private var pendingDelete: AppProxyProfile?
   @State private var systemVPNActive = false
+  @State private var isCheckingSystemVPN = false
 
   var body: some View {
     Form {
-      if systemVPNActive {
-        Section {
-          Label("系统 VPN 已连接", systemImage: "shield.lefthalf.filled")
-            .foregroundStyle(.green)
-          Text("QuotaPulse 当前优先使用系统 VPN；已激活的内部代理会暂时待命，断开 VPN 后自动恢复使用。")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+      Section("网络路径") {
+        HStack {
+          Label(
+            systemVPNActive ? "系统 VPN 已连接" : "未检测到系统 VPN",
+            systemImage: systemVPNActive ? "shield.lefthalf.filled" : "shield.slash"
+          )
+          .foregroundStyle(systemVPNActive ? Color.green : theme.secondaryText)
+          Spacer()
+          Button {
+            Task { await updateSystemVPNStatus() }
+          } label: {
+            if isCheckingSystemVPN {
+              ProgressView()
+            } else {
+              Image(systemName: "arrow.clockwise")
+            }
+          }
+          .buttonStyle(.borderless)
+          .disabled(isCheckingSystemVPN)
+          .accessibilityLabel("重新检测 VPN")
         }
+        Text(
+          systemVPNActive
+            ? "QuotaPulse 当前优先使用系统 VPN；已激活的内部代理会暂时待命，断开 VPN 后自动恢复使用。"
+            : "当前正常请求会使用已激活的 App 内代理；未激活内部代理时保持系统直连。"
+        )
+        .font(.footnote)
+        .foregroundStyle(.secondary)
       }
       Section(editingID == nil ? "创建代理" : "编辑代理") {
         TextField("代理名称（可选）", text: $profileName)
@@ -188,8 +210,12 @@ struct ProxySettingsView: View {
     .navigationTitle("网络代理")
     .navigationBarTitleDisplayMode(.inline)
     .task {
-      systemVPNActive = SystemVPNDetector.isActive()
+      await updateSystemVPNStatus()
       await loadProfiles()
+    }
+    .onChange(of: scenePhase) { phase in
+      guard phase == .active else { return }
+      Task { await updateSystemVPNStatus() }
     }
     .onChange(of: proxyLink) { _ in results = [] }
     .confirmationDialog(
@@ -207,6 +233,13 @@ struct ProxySettingsView: View {
     } message: {
       Text("代理配置和对应密码将从本机删除。")
     }
+  }
+
+  @MainActor private func updateSystemVPNStatus() async {
+    guard !isCheckingSystemVPN else { return }
+    isCheckingSystemVPN = true
+    defer { isCheckingSystemVPN = false }
+    systemVPNActive = await SystemVPNDetector.isActive()
   }
 
   @ViewBuilder private func proxyRow(_ profile: AppProxyProfile) -> some View {
