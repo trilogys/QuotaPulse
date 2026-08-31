@@ -37,6 +37,7 @@ Highlights:
 - Kimi API balance and available-model listing
 - DeepSeek API balance and available-model listing
 - Named HTTP(S) and SOCKS5 proxy links with per-service scope, activation, and latency tests
+- System VPN routing takes priority; the active in-app proxy resumes automatically when no VPN is connected
 - Foreground refresh intervals and an optional iOS background refresh request
 - Custom background interval from 10 to 1,440 minutes
 - Last successful refresh shown on the home screen

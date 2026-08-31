@@ -1,4 +1,29 @@
+import Darwin
 import Foundation
+
+enum SystemVPNDetector {
+  private static let interfacePrefixes = ["utun", "tun", "tap", "ppp", "ipsec", "wg"]
+
+  static func isActive() -> Bool {
+    var addresses: UnsafeMutablePointer<ifaddrs>?
+    guard getifaddrs(&addresses) == 0, let first = addresses else { return false }
+    defer { freeifaddrs(first) }
+
+    var pointer: UnsafeMutablePointer<ifaddrs>? = first
+    while let current = pointer {
+      let interface = current.pointee
+      defer { pointer = interface.ifa_next }
+      guard let address = interface.ifa_addr else { continue }
+      let family = Int32(address.pointee.sa_family)
+      guard family == AF_INET || family == AF_INET6 else { continue }
+      let flags = Int32(interface.ifa_flags)
+      guard flags & IFF_UP != 0, flags & IFF_RUNNING != 0 else { continue }
+      let name = String(cString: interface.ifa_name).lowercased()
+      if interfacePrefixes.contains(where: { name.hasPrefix($0) }) { return true }
+    }
+    return false
+  }
+}
 
 private final class ProxyAuthenticationDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
   let username: String
@@ -73,6 +98,9 @@ struct HTTPClient: Sendable {
     if let proxyOverride {
       proxy = proxyOverride
       password = proxyPasswordOverride ?? ""
+    } else if SystemVPNDetector.isActive() {
+      proxy = .disabled
+      password = ""
     } else if let profile = await SharedStore.shared.activeProxyProfile(for: url) {
       proxy = profile.configuration
       password = (try? KeychainStore.shared.proxyPassword(profileID: profile.id)) ?? ""
@@ -85,6 +113,7 @@ struct HTTPClient: Sendable {
     }
     let delegate = ProxyAuthenticationDelegate(username: proxy.username, password: password)
     let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+    defer { session.finishTasksAndInvalidate() }
     let data: Data
     let response: URLResponse
     do {
