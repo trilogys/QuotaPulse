@@ -24,8 +24,8 @@ android {
         applicationId = "com.trilogys.quotapulse"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1100
-        versionName = "0.11.0"
+        versionCode = 10000
+        versionName = "1.0.0"
     }
 
     if (hasReleaseSigning) {
