@@ -58,12 +58,15 @@ struct BackupSettingsView: View {
     }
     .navigationTitle("导入与导出")
     .sheet(isPresented: $importing) {
-      JSONDocumentPicker {
-        importing = false
-        Task { await importFile($0) }
-      } onCancel: {
-        importing = false
-      }
+      JSONDocumentPicker(
+        onResult: { result in
+          importing = false
+          Task { await importFile(result) }
+        },
+        onCancel: {
+          importing = false
+        }
+      )
     }
     .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .json, defaultFilename: exportFilename) { result in
       if case .failure(let error) = result { model.errorMessage = error.localizedDescription }

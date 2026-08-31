@@ -136,7 +136,7 @@ background=Path('QuotaPulseApp/BackgroundRefreshManager.swift').read_text(encodi
 backup=Path('QuotaPulseApp/BackupSettingsView.swift').read_text(encoding='utf-8')
 assert all(value in background for value in ['BGAppRefreshTaskRequest', 'com.trilogys.quotapulse.refresh', 'scheduleIfEnabled'])
 assert all(value in store for value in ['backgroundRefreshEnabled', 'lastSuccessfulRefreshAt'])
-assert all(value in backup for value in ['.plainText', 'importInProgress', 'importFeedback', 'importStatusText', 'JSONDocumentPicker', '导入失败', '导入与导出格式', 'QuotaPulse-backup-', 'yyyyMMdd-HHmmss'])
+assert all(value in backup for value in ['.plainText', 'importInProgress', 'importFeedback', 'importStatusText', 'JSONDocumentPicker', 'onResult:', 'onCancel:', '导入失败', '导入与导出格式', 'QuotaPulse-backup-', 'yyyyMMdd-HHmmss'])
 assert all(value in content for value in ['homepageLastRefreshAt', 'refreshIntervalPreset', 'customRefreshMinutes', 'importSharedJSON'])
 assert all(value in content for value in ['AccountOverviewRing', 'allAccounts.count > 1', 'checkForUpdate'])
 assert all(value in content for value in ['padding(.vertical, 5)', 'padding(.top, 4)', 'private var ringColor', 'theme.success'])
