@@ -15,13 +15,13 @@ get_cfg() {
   local key="$1"
   grep -E "^${key} *=" "$CFG" | tail -1 | cut -d= -f2- | xargs
 }
-TEAM="$(get_cfg AIQUOTA_TEAM_ID)"
-APP_BUNDLE="$(get_cfg AIQUOTA_APP_BUNDLE_ID)"
-WIDGET_BUNDLE="$(get_cfg AIQUOTA_WIDGET_BUNDLE_ID)"
-APP_GROUP="$(get_cfg AIQUOTA_APP_GROUP)"
-KEYCHAIN_SUFFIX="$(get_cfg AIQUOTA_KEYCHAIN_SUFFIX)"
+TEAM="$(get_cfg QUOTAPULSE_TEAM_ID)"
+APP_BUNDLE="$(get_cfg QUOTAPULSE_APP_BUNDLE_ID)"
+WIDGET_BUNDLE="$(get_cfg QUOTAPULSE_WIDGET_BUNDLE_ID)"
+APP_GROUP="$(get_cfg QUOTAPULSE_APP_GROUP)"
+KEYCHAIN_SUFFIX="$(get_cfg QUOTAPULSE_KEYCHAIN_SUFFIX)"
 
-TMP="$(mktemp -d -t aiquota-profiles)"
+TMP="$(mktemp -d -t quotapulse-profiles)"
 trap 'rm -rf "$TMP"' EXIT
 security cms -D -i "$1" > "$TMP/app.plist"
 security cms -D -i "$2" > "$TMP/widget.plist"

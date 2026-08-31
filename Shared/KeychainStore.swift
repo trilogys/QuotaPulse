@@ -22,7 +22,7 @@ enum SharedCredentialAccessStatus: Sendable, Equatable {
 
 struct KeychainStore: Sendable {
   static let shared = KeychainStore()
-  private static let proxyService = "AIQuota.Proxy"
+  private static let proxyService = "QuotaPulse.Proxy"
   private static let proxyPasswordAccount = "default"
   private static func proxyPasswordAccount(_ profileID: UUID) -> String { "profile.\(profileID.uuidString)" }
 

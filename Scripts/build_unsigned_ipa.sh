@@ -4,12 +4,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-APP_BUNDLE="${AIQUOTA_APP_BUNDLE_ID:-com.example.aiquota}"
-WIDGET_BUNDLE="${AIQUOTA_WIDGET_BUNDLE_ID:-${APP_BUNDLE}.widget}"
-APP_GROUP="${AIQUOTA_APP_GROUP:-group.${APP_BUNDLE}.shared}"
-KEYCHAIN_SUFFIX="${AIQUOTA_KEYCHAIN_SUFFIX:-${APP_BUNDLE}.shared}"
-OUT_DIR="${AIQUOTA_UNSIGNED_OUTPUT_DIR:-build/unsigned-export}"
-DERIVED="${AIQUOTA_UNSIGNED_DERIVED_DIR:-build/unsigned-derived}"
+APP_BUNDLE="${QUOTAPULSE_APP_BUNDLE_ID:-com.example.quotapulse}"
+WIDGET_BUNDLE="${QUOTAPULSE_WIDGET_BUNDLE_ID:-${APP_BUNDLE}.widget}"
+APP_GROUP="${QUOTAPULSE_APP_GROUP:-group.${APP_BUNDLE}.shared}"
+KEYCHAIN_SUFFIX="${QUOTAPULSE_KEYCHAIN_SUFFIX:-${APP_BUNDLE}.shared}"
+OUT_DIR="${QUOTAPULSE_UNSIGNED_OUTPUT_DIR:-build/unsigned-export}"
+DERIVED="${QUOTAPULSE_UNSIGNED_DERIVED_DIR:-build/unsigned-derived}"
 
 usage() {
   cat <<'USAGE'
@@ -23,10 +23,10 @@ Options:
   --output DIR             Output directory (default build/unsigned-export)
 
 This builds a real iphoneos .app + Widget .appex without a code signature and
-packages them into Payload/AIQuota.app. It produces two identical IPA files:
+packages them into Payload/QuotaPulse.app. It produces two identical IPA files:
 
-  AIQuota-unsigned.ipa  generic unsigned artifact
-  AIQuota-resign.ipa    clearly named for third-party re-signing tools
+  QuotaPulse-unsigned.ipa  generic unsigned artifact
+  QuotaPulse-resign.ipa    clearly named for third-party re-signing tools
 
 The resulting IPA is intended for tools such as ESign/全能签 and desktop
 re-signing utilities. A compatible signer must sign BOTH the main .app and the
@@ -58,8 +58,8 @@ rm -rf "$DERIVED" "$OUT_DIR"
 mkdir -p "$DERIVED" "$OUT_DIR"
 
 xcodebuild \
-  -project AIQuota.xcodeproj \
-  -scheme AIQuotaNativeWidget \
+  -project QuotaPulse.xcodeproj \
+  -scheme QuotaPulseNativeWidget \
   -configuration Release \
   -sdk iphoneos \
   -destination 'generic/platform=iOS' \
@@ -68,34 +68,34 @@ xcodebuild \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY='' \
   DEVELOPMENT_TEAM='' \
-  AIQUOTA_APP_BUNDLE_ID="$APP_BUNDLE" \
-  AIQUOTA_WIDGET_BUNDLE_ID="$WIDGET_BUNDLE" \
-  AIQUOTA_APP_GROUP="$APP_GROUP" \
-  AIQUOTA_KEYCHAIN_SUFFIX="$KEYCHAIN_SUFFIX" \
+  QUOTAPULSE_APP_BUNDLE_ID="$APP_BUNDLE" \
+  QUOTAPULSE_WIDGET_BUNDLE_ID="$WIDGET_BUNDLE" \
+  QUOTAPULSE_APP_GROUP="$APP_GROUP" \
+  QUOTAPULSE_KEYCHAIN_SUFFIX="$KEYCHAIN_SUFFIX" \
   build
 
-APP="$(find "$DERIVED/Build/Products/Release-iphoneos" -maxdepth 1 -name 'AIQuotaApp.app' -print -quit)"
-[[ -d "$APP" ]] || { echo "Built AIQuotaApp.app not found." >&2; exit 1; }
+APP="$(find "$DERIVED/Build/Products/Release-iphoneos" -maxdepth 1 -name 'QuotaPulseApp.app' -print -quit)"
+[[ -d "$APP" ]] || { echo "Built QuotaPulseApp.app not found." >&2; exit 1; }
 WIDGET="$(find "$APP/PlugIns" -maxdepth 1 -name '*.appex' -print -quit 2>/dev/null || true)"
 [[ -d "$WIDGET" ]] || { echo "Widget extension was not embedded in the app." >&2; exit 1; }
 
 find "$APP" -name _CodeSignature -type d -prune -exec rm -rf {} + 2>/dev/null || true
 find "$APP" -name embedded.mobileprovision -type f -delete 2>/dev/null || true
 
-STAGE="$(mktemp -d -t aiquota-unsigned)"
+STAGE="$(mktemp -d -t quotapulse-unsigned)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/Payload"
-ditto "$APP" "$STAGE/Payload/AIQuota.app"
+ditto "$APP" "$STAGE/Payload/QuotaPulse.app"
 
-IPA="$ROOT/$OUT_DIR/AIQuota-unsigned.ipa"
-RESIGN_IPA="$ROOT/$OUT_DIR/AIQuota-resign.ipa"
+IPA="$ROOT/$OUT_DIR/QuotaPulse-unsigned.ipa"
+RESIGN_IPA="$ROOT/$OUT_DIR/QuotaPulse-resign.ipa"
 (
   cd "$STAGE"
   /usr/bin/zip -qry "$IPA" Payload
 )
 cp "$IPA" "$RESIGN_IPA"
 
-cat > "$ROOT/$OUT_DIR/AIQuota-unsigned-signing-info.txt" <<INFO
+cat > "$ROOT/$OUT_DIR/QuotaPulse-unsigned-signing-info.txt" <<INFO
 QuotaPulse unsigned / re-sign IPA
 Minimum iOS: 16.0
 Main bundle ID: $APP_BUNDLE
@@ -104,12 +104,12 @@ App Group expected at runtime: $APP_GROUP
 Keychain suffix expected at runtime: $KEYCHAIN_SUFFIX
 
 Artifacts:
-- AIQuota-unsigned.ipa : generic unsigned IPA
-- AIQuota-resign.ipa   : identical copy named for third-party re-signing
+- QuotaPulse-unsigned.ipa : generic unsigned IPA
+- QuotaPulse-resign.ipa   : identical copy named for third-party re-signing
 
 IMPORTANT FOR 全能签 / ESign / 爱思助手 / OTHER RE-SIGN TOOLS:
-- The IPA uses standard Payload/AIQuota.app packaging.
-- The Widget is embedded at Payload/AIQuota.app/PlugIns/AIQuotaWidget.appex.
+- The IPA uses standard Payload/QuotaPulse.app packaging.
+- The Widget is embedded at Payload/QuotaPulse.app/PlugIns/QuotaPulseWidget.appex.
 - The signer must sign BOTH the main app and the embedded Widget extension.
 - The main app and Widget may require separate provisioning profiles.
 - Both profiles must authorize the SAME App Group used by this build.
@@ -124,7 +124,7 @@ INFO
 "$ROOT/Scripts/verify_ipa_structure.sh" "$RESIGN_IPA" unsigned
 (
   cd "$ROOT/$OUT_DIR"
-  shasum -a 256 AIQuota-unsigned.ipa > AIQuota-unsigned.ipa.sha256
-  shasum -a 256 AIQuota-resign.ipa > AIQuota-resign.ipa.sha256
+  shasum -a 256 QuotaPulse-unsigned.ipa > QuotaPulse-unsigned.ipa.sha256
+  shasum -a 256 QuotaPulse-resign.ipa > QuotaPulse-resign.ipa.sha256
 )
 printf '\nUnsigned IPA: %s\nRe-sign IPA: %s\n' "$IPA" "$RESIGN_IPA"

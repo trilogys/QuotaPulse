@@ -4,20 +4,20 @@ enum AppConfig {
   static let version = "0.11.0"
   static var appGroup: String? {
     guard
-      let value = Bundle.main.object(forInfoDictionaryKey: "AIQuotaAppGroup") as? String,
+      let value = Bundle.main.object(forInfoDictionaryKey: "QuotaPulseAppGroup") as? String,
       !value.isEmpty
     else { return nil }
     return value
   }
   static var isAppOnlyBuild: Bool {
-    Bundle.main.object(forInfoDictionaryKey: "AIQuotaSingleProfile") as? Bool ?? false
+    Bundle.main.object(forInfoDictionaryKey: "QuotaPulseSingleProfile") as? Bool ?? false
   }
   static var isWidgetExtension: Bool {
     Bundle.main.bundleURL.pathExtension == "appex"
   }
-  static let widgetKind = "AIQuotaWidget"
-  static let keychainService = "AIQuota.Credentials"
-  static let keychainSuffixInfoKey = "AIQuotaKeychainSuffix"
+  static let widgetKind = "QuotaPulseWidget"
+  static let keychainService = "QuotaPulse.Credentials"
+  static let keychainSuffixInfoKey = "QuotaPulseKeychainSuffix"
   static let codexClientID = "app_EMoamEEZ73f0CkXaXp7hrann"
   static let codexIssuer = "https://auth.openai.com"
   static let codexRedirectURI = "http://localhost:1455/auth/callback"

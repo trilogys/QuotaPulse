@@ -32,8 +32,8 @@ command -v security >/dev/null 2>&1 || { echo "macOS security tool required." >&
 command -v xcodebuild >/dev/null 2>&1 || { echo "Xcode is required." >&2; exit 1; }
 command -v xcodegen >/dev/null 2>&1 || { echo "xcodegen not found; install with: brew install xcodegen" >&2; exit 1; }
 
-TMP="$(mktemp -d -t aiquota-sign)"
-KEYCHAIN="$TMP/aiquota.keychain-db"
+TMP="$(mktemp -d -t quotapulse-sign)"
+KEYCHAIN="$TMP/quotapulse.keychain-db"
 KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
 PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
 mkdir -p "$PROFILE_DIR"
@@ -91,9 +91,9 @@ cp "$WIDGET_PROFILE_SRC" "$WIDGET_INSTALLED"
 IPA="$(find build/export -maxdepth 1 -name '*.ipa' -print -quit)"
 [[ -f "$IPA" ]] || { echo "Signed IPA not produced." >&2; exit 1; }
 ./Scripts/verify_ipa_structure.sh "$IPA" signed
-cp "$IPA" build/export/AIQuota-signed.ipa
+cp "$IPA" build/export/QuotaPulse-signed.ipa
 (
   cd build/export
-  shasum -a 256 AIQuota-signed.ipa > AIQuota-signed.ipa.sha256
+  shasum -a 256 QuotaPulse-signed.ipa > QuotaPulse-signed.ipa.sha256
 )
-printf '\nReady: %s\n' "$ROOT/build/export/AIQuota-signed.ipa"
+printf '\nReady: %s\n' "$ROOT/build/export/QuotaPulse-signed.ipa"

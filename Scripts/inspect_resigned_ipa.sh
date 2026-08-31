@@ -7,7 +7,7 @@ IPA="$1"
 command -v codesign >/dev/null 2>&1 || { echo "codesign required; run this diagnostic on macOS." >&2; exit 1; }
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TMP="$(mktemp -d -t aiquota-resign-check)"
+TMP="$(mktemp -d -t quotapulse-resign-check)"
 trap 'rm -rf "$TMP"' EXIT
 if command -v ditto >/dev/null 2>&1; then ditto -x -k "$IPA" "$TMP"; else unzip -q "$IPA" -d "$TMP"; fi
 APP="$(find "$TMP/Payload" -maxdepth 1 -name '*.app' -print -quit 2>/dev/null || true)"
@@ -19,8 +19,8 @@ APP_PLIST="$APP/Info.plist"; WIDGET_PLIST="$WIDGET/Info.plist"
 read_plist(){ /usr/libexec/PlistBuddy -c "Print :$2" "$1" 2>/dev/null || true; }
 APP_ID="$(read_plist "$APP_PLIST" CFBundleIdentifier)"
 WIDGET_ID="$(read_plist "$WIDGET_PLIST" CFBundleIdentifier)"
-EXPECTED_GROUP="$(read_plist "$APP_PLIST" AIQuotaAppGroup)"
-KEY_SUFFIX="$(read_plist "$APP_PLIST" AIQuotaKeychainSuffix)"
+EXPECTED_GROUP="$(read_plist "$APP_PLIST" QuotaPulseAppGroup)"
+KEY_SUFFIX="$(read_plist "$APP_PLIST" QuotaPulseKeychainSuffix)"
 
 echo "QuotaPulse re-signed IPA diagnostic"
 echo "Main bundle:   $APP_ID"

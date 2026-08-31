@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "AIQuotaAndroid"
+rootProject.name = "QuotaPulseAndroid"
 include(":app")

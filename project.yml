@@ -1,4 +1,4 @@
-name: AIQuota
+name: QuotaPulse
 options:
   bundleIdPrefix: com.example
   deploymentTarget:
@@ -14,34 +14,34 @@ settings:
   base:
     SWIFT_VERSION: 5.9
     IPHONEOS_DEPLOYMENT_TARGET: 16.0
-    DEVELOPMENT_TEAM: $(AIQUOTA_TEAM_ID)
-    CODE_SIGN_STYLE: $(AIQUOTA_CODE_SIGN_STYLE)
+    DEVELOPMENT_TEAM: $(QUOTAPULSE_TEAM_ID)
+    CODE_SIGN_STYLE: $(QUOTAPULSE_CODE_SIGN_STYLE)
 
 targets:
-  AIQuotaApp:
+  QuotaPulseApp:
     type: application
     platform: iOS
     sources:
       - path: Shared
-      - path: AIQuotaApp
+      - path: QuotaPulseApp
     dependencies:
-      - target: AIQuotaWidget
+      - target: QuotaPulseWidget
         embed: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(AIQUOTA_APP_BUNDLE_ID)
-        CODE_SIGN_ENTITLEMENTS: AIQuotaApp/AIQuotaApp.entitlements
-        PROVISIONING_PROFILE_SPECIFIER: $(AIQUOTA_APP_PROFILE_SPECIFIER)
+        PRODUCT_BUNDLE_IDENTIFIER: $(QUOTAPULSE_APP_BUNDLE_ID)
+        CODE_SIGN_ENTITLEMENTS: QuotaPulseApp/QuotaPulseApp.entitlements
+        PROVISIONING_PROFILE_SPECIFIER: $(QUOTAPULSE_APP_PROFILE_SPECIFIER)
         INFOPLIST_KEY_CFBundleDisplayName: QuotaPulse
-        INFOPLIST_KEY_AIQuotaAppGroup: $(AIQUOTA_APP_GROUP)
-        INFOPLIST_KEY_AIQuotaKeychainSuffix: $(AIQUOTA_KEYCHAIN_SUFFIX)
+        INFOPLIST_KEY_QuotaPulseAppGroup: $(QUOTAPULSE_APP_GROUP)
+        INFOPLIST_KEY_QuotaPulseKeychainSuffix: $(QUOTAPULSE_KEYCHAIN_SUFFIX)
         INFOPLIST_KEY_UILaunchScreen_Generation: true
         GENERATE_INFOPLIST_FILE: true
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIconClassic AppIconNight"
         ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: true
     info:
-      path: AIQuotaApp/Info.plist
+      path: QuotaPulseApp/Info.plist
       properties:
         BGTaskSchedulerPermittedIdentifiers:
           - com.trilogys.quotapulse.refresh
@@ -57,45 +57,45 @@ targets:
             CFBundleTypeExtensions:
               - json
         CFBundleURLTypes:
-          - CFBundleURLName: AIQuota
+          - CFBundleURLName: QuotaPulse
             CFBundleURLSchemes:
-              - aiquota
+              - quotapulse
 
-  AIQuotaWidget:
+  QuotaPulseWidget:
     type: app-extension
     platform: iOS
     sources:
       - path: Shared
-      - path: AIQuotaWidget
+      - path: QuotaPulseWidget
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(AIQUOTA_WIDGET_BUNDLE_ID)
-        CODE_SIGN_ENTITLEMENTS: AIQuotaWidget/AIQuotaWidget.entitlements
-        PROVISIONING_PROFILE_SPECIFIER: $(AIQUOTA_WIDGET_PROFILE_SPECIFIER)
+        PRODUCT_BUNDLE_IDENTIFIER: $(QUOTAPULSE_WIDGET_BUNDLE_ID)
+        CODE_SIGN_ENTITLEMENTS: QuotaPulseWidget/QuotaPulseWidget.entitlements
+        PROVISIONING_PROFILE_SPECIFIER: $(QUOTAPULSE_WIDGET_PROFILE_SPECIFIER)
         INFOPLIST_KEY_CFBundleDisplayName: QuotaPulse Widget
-        INFOPLIST_KEY_AIQuotaAppGroup: $(AIQUOTA_APP_GROUP)
-        INFOPLIST_KEY_AIQuotaKeychainSuffix: $(AIQUOTA_KEYCHAIN_SUFFIX)
+        INFOPLIST_KEY_QuotaPulseAppGroup: $(QUOTAPULSE_APP_GROUP)
+        INFOPLIST_KEY_QuotaPulseKeychainSuffix: $(QUOTAPULSE_KEYCHAIN_SUFFIX)
         GENERATE_INFOPLIST_FILE: true
     info:
-      path: AIQuotaWidget/Info.plist
+      path: QuotaPulseWidget/Info.plist
       properties:
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
 
 schemes:
-  AIQuotaApp:
+  QuotaPulseApp:
     build:
       targets:
-        AIQuotaApp: all
+        QuotaPulseApp: all
     run:
       config: Debug
     archive:
       config: Release
 
-  AIQuotaNativeWidget:
+  QuotaPulseNativeWidget:
     build:
       targets:
-        AIQuotaApp: all
-        AIQuotaWidget: all
+        QuotaPulseApp: all
+        QuotaPulseWidget: all
     archive:
       config: Release

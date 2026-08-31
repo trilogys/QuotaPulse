@@ -13,7 +13,7 @@ case "$MODE" in
   *) echo "Invalid verification mode: $MODE" >&2; exit 2 ;;
 esac
 
-TMP="$(mktemp -d -t aiquota-ipa-check)"
+TMP="$(mktemp -d -t quotapulse-ipa-check)"
 trap 'rm -rf "$TMP"' EXIT
 if command -v ditto >/dev/null 2>&1; then
   ditto -x -k "$IPA" "$TMP"
@@ -48,8 +48,8 @@ WIDGET_ID=""
 if [[ -n "$WIDGET" ]]; then
   WIDGET_ID="$(plist_value "$WIDGET/Info.plist" CFBundleIdentifier)"
 fi
-GROUP="$(plist_value "$APP/Info.plist" AIQuotaAppGroup)"
-KEYCHAIN="$(plist_value "$APP/Info.plist" AIQuotaKeychainSuffix)"
+GROUP="$(plist_value "$APP/Info.plist" QuotaPulseAppGroup)"
+KEYCHAIN="$(plist_value "$APP/Info.plist" QuotaPulseKeychainSuffix)"
 [[ -n "$APP_ID" ]] || { echo "FAIL: app bundle identifier missing" >&2; exit 1; }
 [[ "$EXPECT_WIDGET" == "0" || -n "$WIDGET_ID" ]] || { echo "FAIL: widget bundle identifier missing" >&2; exit 1; }
 

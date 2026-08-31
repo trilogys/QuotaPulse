@@ -78,24 +78,24 @@ Kimi Key 的公开接口可返回余额和模型列表，但不提供历史请�
 `Actions → ipa` 支持：
 
 ```text
-AIQuota-iOS-resign
-├─ AIQuota-resign.ipa
-├─ AIQuota-unsigned.ipa
+QuotaPulse-iOS-resign
+├─ QuotaPulse-resign.ipa
+├─ QuotaPulse-unsigned.ipa
 ├─ QuotaPulse.ipa
-├─ AIQuota-app-only-unsigned.ipa
+├─ QuotaPulse-app-only-unsigned.ipa
 ├─ SHA256
 └─ signing-info
 
-AIQuota-signed-release-testing / debugging
-└─ AIQuota-signed.ipa
+QuotaPulse-signed-release-testing / debugging
+└─ QuotaPulse-signed.ipa
 ```
 
 只有 P12/一套描述文件，或使用全能签、爱思助手等兼容性不明确的工具时，优先使用 `QuotaPulse.ipa`。它不包含 Widget Extension，不要求 App Group，只需正确签名主 App。
 
-`AIQuota-resign.ipa` 是包含 Widget 的标准 IPA。包内真实包含：
+`QuotaPulse-resign.ipa` 是包含 Widget 的标准 IPA。包内真实包含：
 
 ```text
-Payload/AIQuota.app/PlugIns/AIQuotaWidget.appex
+Payload/QuotaPulse.app/PlugIns/QuotaPulseWidget.appex
 ```
 
 因此重签工具需要同时正确签名主 App 与 Widget Extension，并处理匹配的 App Group / Keychain entitlements。GitHub Actions 会验证 unsigned/re-sign IPA 的结构、Widget 嵌入和 artifact 输出。
@@ -108,7 +108,7 @@ P12 模式需要：`.p12` + 密码、主 App `.mobileprovision`、Widget `.mobil
 
 技术栈：Kotlin + Jetpack Compose + Jetpack Glance + WorkManager + Android Keystore/EncryptedSharedPreferences。
 
-系统要求：Android 8.0（API 26）以上。`Actions → Android` 的 `AIQuota-Android-debug/app-debug.apk` 可直接侧载；配置固定 release keystore 后生成的 release APK 才能在后续版本中稳定覆盖安装。两个 artifact 都同时提供 `.sha256` 校验文件。
+系统要求：Android 8.0（API 26）以上。`Actions → Android` 的 `QuotaPulse-Android-debug/QuotaPulse.apk` 可直接侧载；配置固定 release keystore 后生成的 release APK 才能在后续版本中稳定覆盖安装。两个 artifact 都同时提供 `.sha256` 校验文件。
 
 当前支持：
 
@@ -213,7 +213,7 @@ ANDROID_KEY_ALIAS
 ANDROID_KEY_PASSWORD
 ```
 
-然后运行 `Actions → Android`，额外生成 `AIQuota-Android-release/app-release.apk`。
+然后运行 `Actions → Android`，额外生成 `QuotaPulse-Android-release/QuotaPulse-release.apk`。
 
 ## 安全
 
@@ -227,8 +227,8 @@ ANDROID_KEY_PASSWORD
 ## 项目结构
 
 ```text
-AIQuotaApp/                       iOS 主 App / OAuth / 多账号
-AIQuotaWidget/                    iOS WidgetKit Interactive Widget
+QuotaPulseApp/                       iOS 主 App / OAuth / 多账号
+QuotaPulseWidget/                    iOS WidgetKit Interactive Widget
 Shared/                           iOS Provider / Keychain / App Intents / Alerts / Localizations
 android/
   app/src/main/java/.../auth/     Android OAuth / PKCE / Device Flow
