@@ -24,7 +24,7 @@ for p in [Path('QuotaPulseApp/QuotaPulseApp.entitlements'), Path('QuotaPulseWidg
 print('entitlements: ok')
 
 s=Path('Shared/AppConfig.swift').read_text(encoding='utf-8')
-assert '1.0.5' in s
+assert '1.0.6' in s
 assert 'QuotaPulseKeychainSuffix' in s
 assert 'QuotaPulseSingleProfile' in s
 ks=Path('Shared/KeychainStore.swift').read_text(encoding='utf-8')
@@ -46,6 +46,10 @@ print('dashboard themes: ok')
 proxy=Path('Shared/ProxyConfiguration.swift').read_text(encoding='utf-8')
 http=Path('Shared/HTTPClient.swift').read_text(encoding='utf-8')
 loopback=Path('QuotaPulseApp/LoopbackOAuthServer.swift').read_text(encoding='utf-8')
+oauth_support=Path('QuotaPulseApp/OAuthSupport.swift').read_text(encoding='utf-8')
+codex_oauth=Path('QuotaPulseApp/CodexOAuthCoordinator.swift').read_text(encoding='utf-8')
+claude_oauth=Path('QuotaPulseApp/ClaudeOAuthCoordinator.swift').read_text(encoding='utf-8')
+kimi_oauth=Path('QuotaPulseApp/KimiOAuthCoordinator.swift').read_text(encoding='utf-8')
 sub2api=Path('Shared/Sub2APIConfigImport.swift').read_text(encoding='utf-8')
 assert 'case http' in proxy and 'case socks5' in proxy
 assert 'connectionProxyDictionary' in http and 'ProxyAuthenticationDelegate' in http
@@ -60,6 +64,13 @@ assert all(value not in proxy_view for value in ['Section("代理类型")', 'Sec
 assert all(value in store for value in ['proxyProfiles', 'activeProxyProfile', 'setProxyProfileActive'])
 assert 'profileID' in ks
 assert all(value in sub2api for value in ['sub2api-data', 'openai', 'anthropic', 'proxy_key', 'access_token'])
+assert all(value in oauth_support for value in ['chooseOAuthAuthorizationMode', 'inAppBrowser', 'copiedLink', 'UIPasteboard.general.string'])
+assert all(value in codex_oauth for value in ['promptForCallback', '完整 localhost 回调地址', 'expectedState: state', 'code_verifier'])
+assert all(value in claude_oauth for value in ['linkWasCopied', 'CODE#STATE', 'code_verifier'])
+assert all(value in kimi_oauth for value in ['showCopiedLinkCode', 'verification_uri_complete', 'authorization_pending'])
+for localization in [Path('Shared/en.lproj/Localizable.strings'), Path('Shared/zh-Hans.lproj/Localizable.strings')]:
+    localized=localization.read_text(encoding='utf-8')
+    assert all(value in localized for value in ['复制授权链接', '粘贴 GPT 回调地址', 'Kimi 授权链接已复制'])
 portable=Path('Shared/PortableConfig.swift').read_text(encoding='utf-8')
 portable_import=Path('Shared/PortableConfigImport.swift').read_text(encoding='utf-8')
 assert all(value in portable for value in ['decodeForImport', 'credentialImportFailed', '_ = try decode(data)'])
@@ -96,6 +107,7 @@ print('OAuth token usage / local history / charts: ok')
 android_models=Path('android/app/src/main/java/com/trilogys/quotapulse/core/Models.kt').read_text(encoding='utf-8')
 android_usage=Path('android/app/src/main/java/com/trilogys/quotapulse/core/UsageService.kt').read_text(encoding='utf-8')
 android_ui=Path('android/app/src/main/java/com/trilogys/quotapulse/MainActivity.kt').read_text(encoding='utf-8')
+android_oauth=Path('android/app/src/main/java/com/trilogys/quotapulse/auth/OAuthManager.kt').read_text(encoding='utf-8')
 android_portable_ui=Path('android/app/src/main/java/com/trilogys/quotapulse/PortableConfigUi.kt').read_text(encoding='utf-8')
 android_theme=Path('android/app/src/main/java/com/trilogys/quotapulse/ui/QuotaPulseTheme.kt').read_text(encoding='utf-8')
 android_gradle=Path('android/app/build.gradle.kts').read_text(encoding='utf-8')
@@ -106,13 +118,15 @@ assert 'availableModels=models' in android_usage and 'availableModels' in androi
 assert 'modelIds(body)' in android_usage and 'request("models")' in android_usage
 assert 'CredentialAuthenticationMode.API_KEY' in android_ui and 'snapshot.connectionLabel' in android_ui
 assert 'R.string.available_models' in android_ui
+assert all(value in android_ui for value in ['copyCodexAuthorizationLink', 'copyClaudeAuthorizationLink', 'copyAuthorizationLink = true', 'R.string.copy_authorization_link'])
+assert all(value in android_oauth for value in ['copyCodexAuthorizationLink', 'copyClaudeAuthorizationLink', 'copyAuthorizationLink', 'codexAuthorizationUri', 'onAuthorizationReady'])
 assert all(value in android_ui for value in ['DashboardOverviewCard', 'AccountDashboardCard', 'ProviderFilterBar', 'AccountEditorSheet', 'SettingsSheet'])
 assert 'val quotaColor = palette.success' in android_ui
 assert 'import androidx.compose.foundation.layout.weight' not in android_ui
 assert all(value in android_theme for value in ['DAYLIGHT', 'NEON', 'GRAPHITE', 'AURORA', 'DashboardThemePreferences', 'LocalDashboardPalette'])
 assert 'DashboardThemeOption.DAYLIGHT.name' in android_theme
 assert 'material-icons-extended' in android_gradle
-assert 'versionCode = 10005' in android_gradle and 'versionName = "1.0.5"' in android_gradle
+assert 'versionCode = 10006' in android_gradle and 'versionName = "1.0.6"' in android_gradle
 assert max(map(len, android_ui.splitlines())) < 180
 assert 'QuotaPulse-backup-' in android_portable_ui and 'yyyyMMdd-HHmmss' in android_portable_ui
 android_string_files=[Path('android/app/src/main/res/values/strings.xml'), Path('android/app/src/main/res/values-zh-rCN/strings.xml')]
@@ -202,10 +216,10 @@ test "$(grep -c 'buildPhase: resources' project.yml)" -eq 1
 test "$(grep -c 'buildPhase: resources' project.single-profile.yml)" -eq 1
 grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 16.0' Config.xcconfig
 grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 16.0' Config.single-profile.xcconfig
-grep -q 'MARKETING_VERSION: 1.0.5' project.yml
-grep -q 'CURRENT_PROJECT_VERSION: 10005' project.yml
-grep -q 'MARKETING_VERSION: 1.0.5' project.single-profile.yml
-grep -q 'CURRENT_PROJECT_VERSION: 10005' project.single-profile.yml
+grep -q 'MARKETING_VERSION: 1.0.6' project.yml
+grep -q 'CURRENT_PROJECT_VERSION: 10006' project.yml
+grep -q 'MARKETING_VERSION: 1.0.6' project.single-profile.yml
+grep -q 'CURRENT_PROJECT_VERSION: 10006' project.single-profile.yml
 grep -q 'QUOTAPULSE_RELEASE_STORE_FILE: ../release.keystore' .github/workflows/android.yml
 grep -q 'QuotaPulse-Android-debug' .github/workflows/android.yml
 grep -q 'QuotaPulse.apk' .github/workflows/android.yml
