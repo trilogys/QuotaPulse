@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.MoreVert
@@ -1068,6 +1069,17 @@ private fun AccountEditorSheet(
                         ) {
                             Text(stringResource(if (seed.reauthAccountID == null) R.string.codex_login else R.string.codex_relogin))
                         }
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                oauth.copyCodexAuthorizationLink()
+                                onStatus(context.getString(R.string.codex_link_copied))
+                            }
+                        ) {
+                            Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.copy_authorization_link))
+                        }
                         OutlinedTextField(
                             value = callbackValue,
                             onValueChange = { callbackValue = it },
@@ -1096,6 +1108,17 @@ private fun AccountEditorSheet(
                             }
                         ) {
                             Text(stringResource(if (seed.reauthAccountID == null) R.string.claude_login else R.string.claude_relogin))
+                        }
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                oauth.copyClaudeAuthorizationLink()
+                                onStatus(context.getString(R.string.claude_link_copied))
+                            }
+                        ) {
+                            Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.copy_authorization_link))
                         }
                         OutlinedTextField(
                             value = callbackValue,
@@ -1129,6 +1152,30 @@ private fun AccountEditorSheet(
                             }
                         ) {
                             Text(stringResource(if (seed.reauthAccountID == null) R.string.kimi_login else R.string.kimi_relogin))
+                        }
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                scope.launch {
+                                    runCatching {
+                                        oauth.loginKimi(copyAuthorizationLink = true) { userCode ->
+                                            onStatus(
+                                                if (userCode == null) {
+                                                    context.getString(R.string.kimi_link_copied)
+                                                } else {
+                                                    context.getString(R.string.kimi_link_copied_with_code, userCode)
+                                                }
+                                            )
+                                        }
+                                    }
+                                        .onSuccess { onCredential(ProviderId.KIMI, name, it) }
+                                        .onFailure { onStatus(it.message ?: "Kimi OAuth failed") }
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.copy_authorization_link))
                         }
                     }
                     else -> Unit

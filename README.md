@@ -28,6 +28,7 @@ Highlights:
 
 - Multiple OAuth and API Key accounts with custom local names
 - ChatGPT OAuth with PKCE and an on-device localhost callback
+- Copyable GPT, Claude, and Kimi authorization links for another browser on the same device; Codex supports manual localhost callback completion, Claude accepts `CODE#STATE`, and Kimi keeps polling the device flow
 - OAuth token refresh and account-scoped cooldown handling
 - Codex quota windows, reset schedule, reset-credit lookup, and user-confirmed manual reset
 - Official Codex lifetime tokens, daily peak, streaks, daily buckets, and a 12-month heatmap

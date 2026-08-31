@@ -50,18 +50,7 @@ class OAuthManager(
         val redirectUri = "http://localhost:${server.localPort}/auth/callback"
         val pending = CodexPending(pkce.first, pkce.second, state, redirectUri, server.localPort)
         codexPending = pending
-        val auth = Uri.parse("https://auth.openai.com/oauth/authorize").buildUpon()
-            .appendQueryParameter("response_type", "code")
-            .appendQueryParameter("client_id", UsageService.CODEX_CLIENT_ID)
-            .appendQueryParameter("redirect_uri", redirectUri)
-            .appendQueryParameter("scope", "openid profile email offline_access api.connectors.read api.connectors.invoke")
-            .appendQueryParameter("code_challenge", pending.challenge)
-            .appendQueryParameter("code_challenge_method", "S256")
-            .appendQueryParameter("id_token_add_organizations", "true")
-            .appendQueryParameter("codex_cli_simplified_flow", "true")
-            .appendQueryParameter("state", state)
-            .appendQueryParameter("originator", "codex_cli_rs")
-            .build()
+        val auth = codexAuthorizationUri(pending)
         withContext(Dispatchers.Main) { openBrowser(auth) }
         try {
             val callback = waitForCallback(server)
@@ -71,12 +60,38 @@ class OAuthManager(
         }
     }
 
+    fun copyCodexAuthorizationLink(): String {
+        val pkce = pkce()
+        val pending = CodexPending(
+            verifier = pkce.first,
+            challenge = pkce.second,
+            state = randomBase64Url(32),
+            redirectUri = "http://localhost:1455/auth/callback",
+            port = 1455
+        )
+        codexPending = pending
+        return codexAuthorizationUri(pending).toString().also {
+            copyText("Codex OAuth link", it)
+        }
+    }
+
     suspend fun completeCodexManual(callbackUrl: String): Credential = withContext(Dispatchers.IO) {
         val pending = codexPending ?: error("请先点击 Codex OAuth 开始授权")
         completeCodexCallback(callbackUrl.trim(), pending)
     }
 
     fun beginClaude(): String {
+        val (url, verifier) = createClaudeAuthorization()
+        openBrowser(url)
+        return verifier
+    }
+
+    fun copyClaudeAuthorizationLink(): String {
+        val (url, _) = createClaudeAuthorization()
+        return url.toString().also { copyText("Claude OAuth link", it) }
+    }
+
+    private fun createClaudeAuthorization(): Pair<Uri, String> {
         val pkce = pkce()
         claudePending = ClaudePending(pkce.first)
         val url = Uri.parse("https://claude.ai/oauth/authorize").buildUpon()
@@ -89,8 +104,7 @@ class OAuthManager(
             .appendQueryParameter("code_challenge_method", "S256")
             .appendQueryParameter("state", pkce.first)
             .build()
-        openBrowser(url)
-        return pkce.first
+        return url to pkce.first
     }
 
     suspend fun completeClaude(codeState: String): Credential = withContext(Dispatchers.IO) {
@@ -120,7 +134,10 @@ class OAuthManager(
         )
     }
 
-    suspend fun loginKimi(): Credential = withContext(Dispatchers.IO) {
+    suspend fun loginKimi(
+        copyAuthorizationLink: Boolean = false,
+        onAuthorizationReady: (userCode: String?) -> Unit = {}
+    ): Credential = withContext(Dispatchers.IO) {
         val headers = kimiDeviceHeaders()
         val firstForm = FormBody.Builder().add("client_id", UsageService.KIMI_CLIENT_ID).build()
         val firstRequest = Request.Builder().url("https://auth.kimi.com/api/oauth/device_authorization")
@@ -130,15 +147,18 @@ class OAuthManager(
         val json = JSONObject(firstBody)
         val deviceCode = json.getString("device_code")
         val userCode = json.getString("user_code")
-        val verification = json.optString("verification_uri_complete").takeIf { it.isNotBlank() }
+        val completeVerification = json.optString("verification_uri_complete").takeIf { it.isNotBlank() }
+        val verification = completeVerification
             ?: json.optString("verification_uri").takeIf { it.isNotBlank() }
             ?: error("Kimi verification URL missing")
         withContext(Dispatchers.Main) {
-            if (!json.has("verification_uri_complete")) {
-                android.content.ClipboardManager::class.java.cast(context.getSystemService(Context.CLIPBOARD_SERVICE))
-                    ?.setPrimaryClip(android.content.ClipData.newPlainText("Kimi code", userCode))
+            if (copyAuthorizationLink) {
+                copyText("Kimi OAuth link", verification)
+            } else {
+                if (completeVerification == null) copyText("Kimi code", userCode)
+                openBrowser(Uri.parse(verification))
             }
-            openBrowser(Uri.parse(verification))
+            onAuthorizationReady(if (completeVerification == null) userCode else null)
         }
 
         var interval = max(1L, json.optLong("interval", 5L))
@@ -201,6 +221,20 @@ class OAuthManager(
         )
     }
 
+    private fun codexAuthorizationUri(pending: CodexPending): Uri =
+        Uri.parse("https://auth.openai.com/oauth/authorize").buildUpon()
+            .appendQueryParameter("response_type", "code")
+            .appendQueryParameter("client_id", UsageService.CODEX_CLIENT_ID)
+            .appendQueryParameter("redirect_uri", pending.redirectUri)
+            .appendQueryParameter("scope", "openid profile email offline_access api.connectors.read api.connectors.invoke")
+            .appendQueryParameter("code_challenge", pending.challenge)
+            .appendQueryParameter("code_challenge_method", "S256")
+            .appendQueryParameter("id_token_add_organizations", "true")
+            .appendQueryParameter("codex_cli_simplified_flow", "true")
+            .appendQueryParameter("state", pending.state)
+            .appendQueryParameter("originator", "codex_cli_rs")
+            .build()
+
     private fun openLoopbackServer(): ServerSocket = runCatching { ServerSocket(1455, 1) }.getOrElse { ServerSocket(1457, 1) }
 
     private fun waitForCallback(server: ServerSocket): String {
@@ -222,6 +256,11 @@ class OAuthManager(
 
     private fun openBrowser(uri: Uri) {
         context.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    private fun copyText(label: String, value: String) {
+        android.content.ClipboardManager::class.java.cast(context.getSystemService(Context.CLIPBOARD_SERVICE))
+            ?.setPrimaryClip(android.content.ClipData.newPlainText(label, value))
     }
 
     private fun execute(request: Request): Pair<Int, String> = client.newCall(request).execute().use { it.code to it.body?.string().orEmpty() }

@@ -26,7 +26,7 @@
 <string name="cancel">Cancel</string>
 <string name="available_balance">Available balance</string>
 <string name="close">Close</string>
-<string name="oauth_sign_in">OAuth sign in</string>
+<string name="oauth_sign_in">OAuth sign in</string><string name="copy_authorization_link">Copy authorization link</string><string name="codex_link_copied">Authorization link copied. Finish in another browser on this device, then paste the final localhost callback URL below.</string><string name="claude_link_copied">Authorization link copied. Finish in another browser on this device, then paste the displayed CODE#STATE below.</string><string name="kimi_link_copied">Authorization link copied. Finish in another browser on this device while QuotaPulse waits for approval.</string><string name="kimi_link_copied_with_code">Authorization link copied. Open it in another browser on this device and enter code %1$s if prompted. QuotaPulse is waiting for approval.</string>
 <string name="api_credentials">API Key or saved credentials</string>
 <string name="base_url_optional">Base URL (optional)</string>
 <string name="appearance">Appearance</string>

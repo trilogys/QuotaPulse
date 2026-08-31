@@ -1,5 +1,37 @@
 import CryptoKit
 import Foundation
+import UIKit
+
+enum OAuthAuthorizationMode {
+  case inAppBrowser
+  case copiedLink
+}
+
+@MainActor
+func chooseOAuthAuthorizationMode(
+  providerName: String,
+  authorizationURL: URL,
+  presenting presenter: UIViewController
+) async throws -> OAuthAuthorizationMode {
+  try await withCheckedThrowingContinuation { continuation in
+    let alert = UIAlertController(
+      title: String(format: NSLocalizedString("%@ 授权", comment: ""), providerName),
+      message: NSLocalizedString("可以在应用内打开，或复制链接到同一台设备的其它浏览器完成授权。", comment: ""),
+      preferredStyle: .alert
+    )
+    alert.addAction(UIAlertAction(title: NSLocalizedString("在应用内打开", comment: ""), style: .default) { _ in
+      continuation.resume(returning: .inAppBrowser)
+    })
+    alert.addAction(UIAlertAction(title: NSLocalizedString("复制授权链接", comment: ""), style: .default) { _ in
+      UIPasteboard.general.string = authorizationURL.absoluteString
+      continuation.resume(returning: .copiedLink)
+    })
+    alert.addAction(UIAlertAction(title: NSLocalizedString("取消", comment: ""), style: .cancel) { _ in
+      continuation.resume(throwing: UsageError.refreshFailed("Login cancelled"))
+    })
+    presenter.present(alert, animated: true)
+  }
+}
 
 struct PKCEPair: Sendable {
   let verifier: String

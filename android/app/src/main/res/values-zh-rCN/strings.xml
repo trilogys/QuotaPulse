@@ -26,7 +26,7 @@
 <string name="cancel">取消</string>
 <string name="available_balance">可用余额</string>
 <string name="close">关闭</string>
-<string name="oauth_sign_in">OAuth 登录</string>
+<string name="oauth_sign_in">OAuth 登录</string><string name="copy_authorization_link">复制授权链接</string><string name="codex_link_copied">授权链接已复制。请在同一台设备的其它浏览器完成授权，再把最终 localhost 回调地址粘贴到下方。</string><string name="claude_link_copied">授权链接已复制。请在同一台设备的其它浏览器完成授权，再把页面显示的 CODE#STATE 粘贴到下方。</string><string name="kimi_link_copied">授权链接已复制。请在同一台设备的其它浏览器完成授权，QuotaPulse 正在等待结果。</string><string name="kimi_link_copied_with_code">授权链接已复制。请在同一台设备的其它浏览器打开，如页面要求验证码请输入 %1$s。QuotaPulse 正在等待结果。</string>
 <string name="api_credentials">API Key 或已保存凭据</string>
 <string name="base_url_optional">Base URL（可选）</string>
 <string name="appearance">外观</string>

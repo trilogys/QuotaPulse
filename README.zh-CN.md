@@ -45,6 +45,7 @@ QuotaPulse 不直接复制某一个项目的 UI，而是组合三个方向：
 - 代理只通过单条 HTTP(S) / SOCKS5 链接配置，不分散填写主机、端口和凭据
 - OAuth 与 API Key 账号创建时均可自定义显示名称
 - OAuth token 自动 refresh
+- GPT、Claude、Kimi 授权链接可复制到同一台设备的其它浏览器；Codex 支持粘贴最终 localhost 回调，Claude 支持粘贴 `CODE#STATE`，Kimi Device OAuth 会继续轮询授权结果
 - 多账号 UUID 隔离
 - 账号重命名、启用/隐藏、排序
 - 每个 Provider 自动标记推荐账号

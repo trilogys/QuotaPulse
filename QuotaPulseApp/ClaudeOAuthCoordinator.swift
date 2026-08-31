@@ -22,14 +22,22 @@ final class ClaudeOAuthCoordinator: NSObject, SFSafariViewControllerDelegate {
       ]
     )
 
-    let safari = SFSafariViewController(url: authURL)
-    safari.delegate = self
-    presenter.present(safari, animated: true)
-    await withCheckedContinuation { continuation in
-      closeContinuation = continuation
+    let mode = try await chooseOAuthAuthorizationMode(
+      providerName: "Claude",
+      authorizationURL: authURL,
+      presenting: presenter
+    )
+    try? await Task.sleep(nanoseconds: 250_000_000)
+    if mode == .inAppBrowser {
+      let safari = SFSafariViewController(url: authURL)
+      safari.delegate = self
+      presenter.present(safari, animated: true)
+      await withCheckedContinuation { continuation in
+        closeContinuation = continuation
+      }
     }
 
-    let raw = try await promptForCode(presenting: presenter)
+    let raw = try await promptForCode(presenting: presenter, linkWasCopied: mode == .copiedLink)
     let parts = raw.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
     guard let first = parts.first, !first.isEmpty else {
       throw UsageError.refreshFailed("Missing Claude authorization code")
@@ -74,16 +82,18 @@ final class ClaudeOAuthCoordinator: NSObject, SFSafariViewControllerDelegate {
     closeContinuation = nil
   }
 
-  private func promptForCode(presenting presenter: UIViewController) async throws -> String {
+  private func promptForCode(presenting presenter: UIViewController, linkWasCopied: Bool) async throws -> String {
     try await withCheckedThrowingContinuation { continuation in
       let alert = UIAlertController(
         title: "粘贴 Claude 授权码",
-        message: "把授权页面显示的完整 CODE#STATE 粘贴到这里。",
+        message: linkWasCopied
+          ? NSLocalizedString("已复制授权链接。请在其它浏览器完成授权，再把页面显示的完整 CODE#STATE 粘贴到这里。", comment: "")
+          : NSLocalizedString("把授权页面显示的完整 CODE#STATE 粘贴到这里。", comment: ""),
         preferredStyle: .alert
       )
       alert.addTextField { field in
         field.placeholder = "CODE#STATE"
-        if let text = UIPasteboard.general.string, text.count < 1000 { field.text = text }
+        if !linkWasCopied, let text = UIPasteboard.general.string, text.count < 1000 { field.text = text }
         field.autocapitalizationType = .none
         field.autocorrectionType = .no
       }

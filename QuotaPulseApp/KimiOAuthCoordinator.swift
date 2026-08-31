@@ -34,7 +34,14 @@ final class KimiOAuthCoordinator: NSObject, SFSafariViewControllerDelegate {
       throw UsageError.invalidResponse("Kimi verification URL missing")
     }
 
-    if json["verification_uri_complete"] == nil {
+    let mode = try await chooseOAuthAuthorizationMode(
+      providerName: "Kimi",
+      authorizationURL: verifyURL,
+      presenting: presenter
+    )
+    try? await Task.sleep(nanoseconds: 250_000_000)
+
+    if json["verification_uri_complete"] == nil, mode == .inAppBrowser {
       UIPasteboard.general.string = userCode
       let alert = UIAlertController(
         title: "Kimi 授权码已复制",
@@ -47,10 +54,19 @@ final class KimiOAuthCoordinator: NSObject, SFSafariViewControllerDelegate {
       alert.dismiss(animated: true)
     }
 
-    let browser = SFSafariViewController(url: verifyURL)
-    browser.delegate = self
-    safari = browser
-    presenter.present(browser, animated: true)
+    let browser: SFSafariViewController?
+    if mode == .inAppBrowser {
+      let controller = SFSafariViewController(url: verifyURL)
+      controller.delegate = self
+      safari = controller
+      presenter.present(controller, animated: true)
+      browser = controller
+    } else {
+      browser = nil
+      if json["verification_uri_complete"] == nil {
+        showCopiedLinkCode(userCode, presenting: presenter)
+      }
+    }
 
     var interval = max(1.0, number(json["interval"]) ?? 5)
     let expires = max(60.0, number(json["expires_in"]) ?? 900)
@@ -71,7 +87,7 @@ final class KimiOAuthCoordinator: NSObject, SFSafariViewControllerDelegate {
       )
       let body = (try? poll.jsonDictionary()) ?? [:]
       if (200..<300).contains(poll.statusCode), let access = body["access_token"] as? String {
-        browser.dismiss(animated: true)
+        browser?.dismiss(animated: true)
         safari = nil
         return Credential(
           accessToken: access,
@@ -93,13 +109,29 @@ final class KimiOAuthCoordinator: NSObject, SFSafariViewControllerDelegate {
         throw UsageError.refreshFailed("Kimi login: \(error)")
       }
     }
-    browser.dismiss(animated: true)
+    browser?.dismiss(animated: true)
     safari = nil
     throw UsageError.refreshFailed("Kimi authorization timed out")
   }
 
   func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
     cancelled = true
+  }
+
+  private func showCopiedLinkCode(_ userCode: String, presenting presenter: UIViewController) {
+    let alert = UIAlertController(
+      title: NSLocalizedString("Kimi 授权链接已复制", comment: ""),
+      message: String(
+        format: NSLocalizedString("请在其它浏览器打开链接。页面需要验证码时输入：%@", comment: ""),
+        userCode
+      ),
+      preferredStyle: .alert
+    )
+    alert.addAction(UIAlertAction(title: NSLocalizedString("复制验证码", comment: ""), style: .default) { _ in
+      UIPasteboard.general.string = userCode
+    })
+    alert.addAction(UIAlertAction(title: NSLocalizedString("好", comment: ""), style: .cancel))
+    presenter.present(alert, animated: true)
   }
 
   private func deviceHeaders() -> [String: String] {

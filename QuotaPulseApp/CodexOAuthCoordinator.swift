@@ -40,6 +40,32 @@ final class CodexOAuthCoordinator: NSObject, SFSafariViewControllerDelegate {
       ]
     )
 
+    let mode: OAuthAuthorizationMode
+    do {
+      mode = try await chooseOAuthAuthorizationMode(
+        providerName: "GPT / Codex",
+        authorizationURL: authURL,
+        presenting: presenter
+      )
+      try? await Task.sleep(nanoseconds: 250_000_000)
+    } catch {
+      server.cancel()
+      self.server = nil
+      throw error
+    }
+
+    if mode == .copiedLink {
+      server.cancel()
+      self.server = nil
+      let callback = try await promptForCallback(presenting: presenter)
+      return try await exchange(
+        callback: callback,
+        expectedState: state,
+        pkce: pkce,
+        redirectURI: redirectURI
+      )
+    }
+
     let browser = SFSafariViewController(url: authURL)
     browser.delegate = self
     safari = browser
@@ -62,6 +88,47 @@ final class CodexOAuthCoordinator: NSObject, SFSafariViewControllerDelegate {
 
   func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
     server?.cancel()
+  }
+
+  private func promptForCallback(presenting presenter: UIViewController) async throws -> URL {
+    try await withCheckedThrowingContinuation { continuation in
+      let alert = UIAlertController(
+        title: NSLocalizedString("粘贴 GPT 回调地址", comment: ""),
+        message: NSLocalizedString(
+          "已复制授权链接。请在其它浏览器完成授权，复制最终的 localhost 完整地址，再返回此处粘贴。",
+          comment: ""
+        ),
+        preferredStyle: .alert
+      )
+      alert.addTextField { field in
+        field.placeholder = NSLocalizedString("完整 localhost 回调地址", comment: "")
+        if let value = UIPasteboard.general.string,
+          value.hasPrefix("http://localhost"),
+          value.contains("/auth/callback")
+        {
+          field.text = value
+        }
+        field.autocapitalizationType = .none
+        field.autocorrectionType = .no
+        field.keyboardType = .URL
+      }
+      alert.addAction(UIAlertAction(title: NSLocalizedString("取消", comment: ""), style: .cancel) { _ in
+        continuation.resume(throwing: UsageError.refreshFailed("Login cancelled"))
+      })
+      alert.addAction(UIAlertAction(title: NSLocalizedString("完成", comment: ""), style: .default) { _ in
+        let raw = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard let url = URL(string: raw),
+          url.scheme == "http",
+          url.host == "localhost",
+          url.path == "/auth/callback"
+        else {
+          continuation.resume(throwing: UsageError.refreshFailed("Invalid localhost callback URL"))
+          return
+        }
+        continuation.resume(returning: url)
+      })
+      presenter.present(alert, animated: true)
+    }
   }
 
   private func exchange(callback: URL, expectedState: String, pkce: PKCEPair, redirectURI: String) async throws
