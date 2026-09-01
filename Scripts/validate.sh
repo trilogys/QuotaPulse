@@ -24,7 +24,7 @@ for p in [Path('QuotaPulseApp/QuotaPulseApp.entitlements'), Path('QuotaPulseWidg
 print('entitlements: ok')
 
 s=Path('Shared/AppConfig.swift').read_text(encoding='utf-8')
-assert '1.0.6' in s
+assert '1.0.7' in s
 assert 'QuotaPulseKeychainSuffix' in s
 assert 'QuotaPulseSingleProfile' in s
 ks=Path('Shared/KeychainStore.swift').read_text(encoding='utf-8')
@@ -126,7 +126,7 @@ assert 'import androidx.compose.foundation.layout.weight' not in android_ui
 assert all(value in android_theme for value in ['DAYLIGHT', 'NEON', 'GRAPHITE', 'AURORA', 'DashboardThemePreferences', 'LocalDashboardPalette'])
 assert 'DashboardThemeOption.DAYLIGHT.name' in android_theme
 assert 'material-icons-extended' in android_gradle
-assert 'versionCode = 10006' in android_gradle and 'versionName = "1.0.6"' in android_gradle
+assert 'versionCode = 10007' in android_gradle and 'versionName = "1.0.7"' in android_gradle
 assert max(map(len, android_ui.splitlines())) < 180
 assert 'QuotaPulse-backup-' in android_portable_ui and 'yyyyMMdd-HHmmss' in android_portable_ui
 android_string_files=[Path('android/app/src/main/res/values/strings.xml'), Path('android/app/src/main/res/values-zh-rCN/strings.xml')]
@@ -148,6 +148,7 @@ for name in ['AppIconCurrentPreview', 'AppIconClassicPreview', 'AppIconNightPrev
 print('AppIcon catalogs and Settings previews: ok')
 
 content=Path('QuotaPulseApp/ContentView.swift').read_text(encoding='utf-8')
+app_model=Path('QuotaPulseApp/AppModel.swift').read_text(encoding='utf-8')
 icon_script=Path('Scripts/generate_app_icon.py').read_text(encoding='utf-8')
 assert 'case .classic: nil' in content and 'selectedAppIcon: AppIconChoice = .classic' in content
 assert '("AppIcon", "AppIconClassicPreview", draw_classic())' in icon_script
@@ -168,7 +169,17 @@ assert Path('Scriptable/QuotaPulseWidget.js').exists()
 assert all(value in content for value in ['homepageLastRefreshAt', 'refreshIntervalPreset', 'customRefreshMinutes', 'importSharedJSON'])
 assert all(value in content for value in ['AccountOverviewRing', 'allAccounts.count > 1', 'checkForUpdate'])
 assert all(value in content for value in ['padding(.vertical, 5)', 'padding(.top, 4)', 'private var ringColor', 'theme.success'])
+assert 'foregroundStyle(balance.available ? theme.success : .red)' in content
+assert 'snapshot?.balance == nil ? theme.success : accent' not in content
+assert 'BalanceDisplay(it, accent)' not in android_ui
+assert all(value in android_ui for value in ['BalanceDisplay(it)', 'if (balance.available) palette.success', 'snapshot?.balance?.available == false'])
 assert all(value in content for value in ['didLoadInitialState', 'refreshOnActivationIfNeeded', 'force: true', 'refreshTimeText'])
+assert 'refreshAllInProgress' in app_model
+refresh_all=app_model.split('func refreshAll', 1)[1].split('func queryCodexResetCredits', 1)[0]
+assert 'isBusy=true' not in refresh_all and 'isBusy=false' not in refresh_all
+single_refresh=app_model.split('func refresh(_ account', 1)[1].split('func refreshAll', 1)[0]
+assert 'errorMessage=' not in single_refresh
+assert all(value not in android_ui for value in ['status = context.getString(R.string.refreshing)', 'status = context.getString(R.string.refresh_complete)', 'refreshing: Boolean'])
 update=Path('QuotaPulseApp/UpdateChecker.swift').read_text(encoding='utf-8')
 assert all(value in update for value in ['trilogys/QuotaPulse/releases/latest', 'AvailableAppUpdate', 'AppConfig.version'])
 assert 'availableModels' in models_text and 'AvailableModelsRow' in content
@@ -216,10 +227,10 @@ test "$(grep -c 'buildPhase: resources' project.yml)" -eq 1
 test "$(grep -c 'buildPhase: resources' project.single-profile.yml)" -eq 1
 grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 16.0' Config.xcconfig
 grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 16.0' Config.single-profile.xcconfig
-grep -q 'MARKETING_VERSION: 1.0.6' project.yml
-grep -q 'CURRENT_PROJECT_VERSION: 10006' project.yml
-grep -q 'MARKETING_VERSION: 1.0.6' project.single-profile.yml
-grep -q 'CURRENT_PROJECT_VERSION: 10006' project.single-profile.yml
+grep -q 'MARKETING_VERSION: 1.0.7' project.yml
+grep -q 'CURRENT_PROJECT_VERSION: 10007' project.yml
+grep -q 'MARKETING_VERSION: 1.0.7' project.single-profile.yml
+grep -q 'CURRENT_PROJECT_VERSION: 10007' project.single-profile.yml
 grep -q 'QUOTAPULSE_RELEASE_STORE_FILE: ../release.keystore' .github/workflows/android.yml
 grep -q 'QuotaPulse-Android-debug' .github/workflows/android.yml
 grep -q 'QuotaPulse.apk' .github/workflows/android.yml
