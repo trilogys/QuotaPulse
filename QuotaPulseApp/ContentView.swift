@@ -544,12 +544,8 @@ private struct DashboardSummary: View {
   let providerCount: Int
   let lastUpdatedAt: Date?
 
-  private var accent: Color {
-    account.map { theme.accent(for: $0.provider) } ?? theme.primary
-  }
-
   private var quotaColor: Color {
-    snapshot?.balance == nil ? theme.success : accent
+    snapshot?.balance?.available == false ? .red : theme.success
   }
 
   private var progress: Double? {
@@ -588,7 +584,7 @@ private struct DashboardSummary: View {
               .minimumScaleFactor(0.75)
             Text(primaryValue)
               .font(.system(size: 38, weight: .bold, design: .rounded))
-              .foregroundStyle(theme.primaryText)
+              .foregroundStyle(snapshot == nil ? theme.secondaryText : quotaColor)
             Text(primaryLabel)
               .font(.system(size: 11, weight: .medium))
               .foregroundStyle(quotaColor)
@@ -856,7 +852,7 @@ private struct SnapshotDashboardBody: View {
           Spacer()
           Text("\(balance.symbol)\(balance.total, specifier: "%.2f")")
             .font(.system(size: 24, weight: .bold, design: .rounded))
-            .foregroundStyle(balance.available ? accent : .red)
+            .foregroundStyle(balance.available ? theme.success : .red)
         }
       } else if !snapshot.windows.isEmpty {
         ForEach(snapshot.windows.prefix(3)) { window in
@@ -970,7 +966,6 @@ private struct AccountOverviewRing: View {
   let account: AccountRecord
   let snapshot: UsageSnapshot?
 
-  private var accent: Color { theme.accent(for: account.provider) }
   private var progress: Double? {
     snapshot?.windows.map(\.remainingPercent).min().map { min(1, max(0, $0 / 100)) }
   }
@@ -981,7 +976,7 @@ private struct AccountOverviewRing: View {
   }
 
   private var ringColor: Color {
-    progress == nil ? accent : theme.success
+    snapshot?.balance?.available == false ? .red : theme.success
   }
 
   var body: some View {
@@ -994,7 +989,7 @@ private struct AccountOverviewRing: View {
           .rotationEffect(.degrees(-90))
         Text(value)
           .font(.system(size: 13, weight: .bold, design: .rounded))
-          .foregroundStyle(progress == nil ? theme.primaryText : theme.success)
+          .foregroundStyle(snapshot == nil ? theme.secondaryText : ringColor)
           .minimumScaleFactor(0.58)
           .lineLimit(1)
           .padding(6)

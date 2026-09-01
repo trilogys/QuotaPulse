@@ -296,19 +296,19 @@ private fun QuotaPulseScreen(
             item {
                 AccountSectionHeader(
                     count = filteredAccounts.size,
-                    refreshing = isRefreshing,
                     onRefreshAll = {
                         if (!isRefreshing) {
                             scope.launch {
                                 isRefreshing = true
-                                status = context.getString(R.string.refreshing)
-                                withContext(Dispatchers.IO) {
-                                    store.accounts().filter { it.enabled }.forEach { refreshOne(it) }
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        store.accounts().filter { it.enabled }.forEach { refreshOne(it) }
+                                    }
+                                    reload()
+                                    updateWidget()
+                                } finally {
+                                    isRefreshing = false
                                 }
-                                updateWidget()
-                                reload()
-                                isRefreshing = false
-                                status = context.getString(R.string.refresh_complete)
                             }
                         }
                     }
@@ -329,10 +329,9 @@ private fun QuotaPulseScreen(
                         health = providerHealthText(context, snapshot, store.cooldownUntil(account.id)),
                         onRefresh = {
                             scope.launch {
-                                status = "${context.getString(R.string.refresh)} ${account.name}"
                                 withContext(Dispatchers.IO) { refreshOne(account) }
-                                updateWidget()
                                 reload()
+                                updateWidget()
                             }
                         },
                         onReauthenticate = { beginReauthentication(account) },
@@ -598,8 +597,7 @@ private fun DashboardOverviewCard(
 @Composable
 private fun AccountOverviewRing(account: AccountRecord, snapshot: UsageSnapshot?) {
     val palette = LocalDashboardPalette.current
-    val accent = palette.accent(account.provider)
-    val quotaColor = if (snapshot?.balance == null) palette.success else accent
+    val quotaColor = if (snapshot?.balance?.available == false) MaterialTheme.colorScheme.error else palette.success
     val progress = snapshot?.windows?.minOfOrNull { it.remainingPercent }
         ?.div(100.0)?.coerceIn(0.0, 1.0)?.toFloat()
         ?: if (snapshot?.balance?.available == true) 1f else 0f
@@ -618,7 +616,7 @@ private fun AccountOverviewRing(account: AccountRecord, snapshot: UsageSnapshot?
             )
             Text(
                 value,
-                color = if (snapshot?.balance == null) palette.success else palette.primaryText,
+                color = if (snapshot == null) palette.secondaryText else quotaColor,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1
@@ -649,7 +647,6 @@ private fun OverviewMetric(value: String, label: String, modifier: Modifier = Mo
 @Composable
 private fun AccountSectionHeader(
     count: Int,
-    refreshing: Boolean,
     onRefreshAll: () -> Unit
 ) {
     val palette = LocalDashboardPalette.current
@@ -671,16 +668,8 @@ private fun AccountSectionHeader(
             fontWeight = FontWeight.Bold
         )
         Spacer(Modifier.weight(1f))
-        TextButton(onClick = onRefreshAll, enabled = !refreshing) {
-            if (refreshing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    color = palette.secondary,
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-            }
+        TextButton(onClick = onRefreshAll) {
+            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.refresh_all), fontWeight = FontWeight.SemiBold)
         }
@@ -820,7 +809,7 @@ private fun AccountDashboardCard(
                 Text(it, color = palette.warning, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
 
-            snapshot?.balance?.let { BalanceDisplay(it, accent) }
+            snapshot?.balance?.let { BalanceDisplay(it) }
             snapshot?.windows?.take(3)?.forEach { window -> QuotaWindowDisplay(window) }
 
             if (
@@ -928,7 +917,7 @@ private fun StatusPill(text: String, color: Color) {
 }
 
 @Composable
-private fun BalanceDisplay(balance: BalanceSnapshot, accent: Color) {
+private fun BalanceDisplay(balance: BalanceSnapshot) {
     val palette = LocalDashboardPalette.current
     Row(verticalAlignment = Alignment.Bottom) {
         Text(
@@ -940,7 +929,7 @@ private fun BalanceDisplay(balance: BalanceSnapshot, accent: Color) {
         )
         Text(
             "${balance.symbol}${"%.2f".format(balance.total)}",
-            color = if (balance.available) accent else MaterialTheme.colorScheme.error,
+            color = if (balance.available) palette.success else MaterialTheme.colorScheme.error,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold
         )
